@@ -20,7 +20,7 @@ class UserViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         """Set permissions based on action"""
-        if self.action in ['create', 'register']:
+        if self.action in ['create', 'register', 'login']:
             return [AllowAny()]
         return [IsAuthenticated()]
     

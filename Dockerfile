@@ -22,10 +22,9 @@ RUN pip install --upgrade pip && \
 # Copy project files
 COPY . .
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
-USER appuser
+# Create necessary directories with world-writable permissions
+RUN mkdir -p /app/staticfiles /app/media && \
+    chmod -R 777 /app/staticfiles /app/media
 
 # Expose port
 EXPOSE 8000
