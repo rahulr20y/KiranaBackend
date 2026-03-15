@@ -77,7 +77,7 @@ if 'db-20260315t133413.supabase.co' in db_url:
     db_url = db_url.replace('db-20260315t133413.supabase.co', 'db.fzcqycmytrmvmtlbqovt.supabase.co')
 
 DATABASES = {
-    'default': dj_database_url.config(default=db_url)
+    'default': dj_database_url.parse(db_url)
 }
 
 # Password validation
