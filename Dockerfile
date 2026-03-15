@@ -31,5 +31,4 @@ RUN mkdir -p /app/staticfiles /app/media && \
 EXPOSE 8000
 
 # Run migrations and collectstatic, then start gunicorn
-# Note: Migrations might need a DB connection, so we often do it in a separate job or at startup.
-CMD ["sh", "-c", "python manage.py collectstatic --noinput && gunicorn kirana.wsgi:application --bind 0.0.0.0:8080 --workers 4"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn kirana.wsgi:application --bind 0.0.0.0:8080 --workers 4"]
