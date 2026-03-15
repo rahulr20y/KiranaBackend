@@ -31,4 +31,5 @@ RUN mkdir -p /app/staticfiles /app/media && \
 EXPOSE 8000
 
 # Run migrations and collectstatic, then start gunicorn
-CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn kirana.wsgi:application --bind 0.0.0.0:8080 --workers 4"]
+# Use the PORT environment variable provided by Render
+CMD ["sh", "-c", "echo 'Running migrations...' && python manage.py migrate --noinput && echo 'Collecting static files...' && python manage.py collectstatic --noinput && echo 'Starting Gunicorn on port $PORT...' && gunicorn kirana.wsgi:application --bind 0.0.0.0:$PORT --workers 4"]
