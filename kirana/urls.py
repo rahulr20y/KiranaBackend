@@ -24,6 +24,8 @@ router.register(r'shopkeepers', ShopkeeperViewSet, basename='shopkeeper')
 router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'categories', CategoryViewSet, basename='category')
 
+from django.db import connection
+
 def home_view(request):
     return JsonResponse({
         "status": "online",
@@ -31,8 +33,18 @@ def home_view(request):
         "version": "v1"
     })
 
+def diag_view(request):
+    with connection.cursor() as cursor:
+        tables = connection.introspection.table_names(cursor)
+    return JsonResponse({
+        "database": connection.settings_dict['NAME'],
+        "tables": tables,
+        "debug": settings.DEBUG
+    })
+
 urlpatterns = [
     path('', home_view, name='home'),
+    path('api/diag/', diag_view, name='diag'),
     # Admin
     path('admin/', admin.site.urls),
     
