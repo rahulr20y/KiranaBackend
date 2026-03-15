@@ -71,10 +71,13 @@ TEMPLATES = [
 WSGI_APPLICATION = 'kirana.wsgi.application'
 
 # Database
+db_url = config('DATABASE_URL', default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+# Fix for Supabase host change in production if env var is stale
+if 'db-20260315t133413.supabase.co' in db_url:
+    db_url = db_url.replace('db-20260315t133413.supabase.co', 'db.fzcqycmytrmvmtlbqovt.supabase.co')
+
 DATABASES = {
-    'default': dj_database_url.config(
-        default=config('DATABASE_URL', default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
-    )
+    'default': dj_database_url.config(default=db_url)
 }
 
 # Password validation
