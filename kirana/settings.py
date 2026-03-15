@@ -138,11 +138,12 @@ REST_FRAMEWORK = {
 AUTH_USER_MODEL = 'users.User'
 
 # CORS and CSRF Configuration
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:3000').split(',')
+# CORS and CSRF Configuration
+# We include the detected Vercel domain by default to prevent initial config blockers
+DEFAULT_ORIGINS = 'http://localhost:3000,https://kiranafrontend.vercel.app'
+CORS_ALLOWED_ORIGINS = [o.strip() for o in config('CORS_ALLOWED_ORIGINS', default=DEFAULT_ORIGINS).split(',') if o.strip()]
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in config('CSRF_TRUSTED_ORIGINS', default=DEFAULT_ORIGINS).split(',') if o.strip()]
 
-# Render and Vercel domains are added via environment variables in production.
-# Tip: Set CORS_ALLOWED_ORIGINS to https://your-app.vercel.app in Render Dashboard.
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
