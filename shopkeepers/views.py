@@ -31,16 +31,25 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated()])
     def my_profile(self, request):
-        """Get current shopkeeper's profile"""
+        """Get current shopkeeper's profile, create if it doesn't exist"""
+        if request.user.user_type != 'shopkeeper':
+            return Response(
+                {'error': 'User is not a shopkeeper'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
         try:
             shopkeeper = request.user.shopkeeper_profile
-            serializer = ShopkeeperSerializer(shopkeeper)
-            return Response(serializer.data)
         except Shopkeeper.DoesNotExist:
-            return Response(
-                {'error': 'Shopkeeper profile not found'},
-                status=status.HTTP_404_NOT_FOUND
+            # Lazy creation for legacy users
+            shopkeeper = Shopkeeper.objects.create(
+                user=request.user,
+                shop_name=f"{request.user.first_name}'s Shop" if request.user.first_name else f"{request.user.username}'s Shop",
+                business_type="Retail"
             )
+            
+        serializer = ShopkeeperSerializer(shopkeeper)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated()])
     def create_profile(self, request):
@@ -71,12 +80,12 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
     
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated()])
-    def follow_dealer(self, request, pk=None):
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated()])
+    def follow_dealer(self, request):
         """Follow a dealer"""
         try:
             shopkeeper = request.user.shopkeeper_profile
-            dealer_id = request.data.get('dealer_id')
+            dealer_id = request.data.get('dealer_id') or request.query_params.get('dealer_id')
             if dealer_id:
                 shopkeeper.preferred_dealers.add(dealer_id)
                 return Response({'message': 'Dealer followed'})
@@ -87,12 +96,12 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
     
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated()])
-    def unfollow_dealer(self, request, pk=None):
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated()])
+    def unfollow_dealer(self, request):
         """Unfollow a dealer"""
         try:
             shopkeeper = request.user.shopkeeper_profile
-            dealer_id = request.data.get('dealer_id')
+            dealer_id = request.data.get('dealer_id') or request.query_params.get('dealer_id')
             if dealer_id:
                 shopkeeper.preferred_dealers.remove(dealer_id)
                 return Response({'message': 'Dealer unfollowed'})

@@ -31,16 +31,26 @@ class DealerViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated()])
     def my_profile(self, request):
-        """Get current dealer's profile"""
+        """Get current dealer's profile, create if it doesn't exist"""
+        if request.user.user_type != 'dealer':
+            return Response(
+                {'error': 'User is not a dealer'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
         try:
             dealer = request.user.dealer_profile
-            serializer = DealerSerializer(dealer)
-            return Response(serializer.data)
         except Dealer.DoesNotExist:
-            return Response(
-                {'error': 'Dealer profile not found'},
-                status=status.HTTP_404_NOT_FOUND
+            # Lazy creation for legacy users
+            dealer = Dealer.objects.create(
+                user=request.user,
+                business_name=f"{request.user.first_name}'s Business" if request.user.first_name else f"{request.user.username}'s Business",
+                business_license=f"LICENSE-{request.user.id}-{request.user.username[:5]}",
+                business_category="General"
             )
+            
+        serializer = DealerSerializer(dealer)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated()])
     def create_profile(self, request):

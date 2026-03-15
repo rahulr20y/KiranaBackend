@@ -36,9 +36,29 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
+        user_type = validated_data.get('user_type')
+        
         user = User.objects.create_user(**validated_data)
         user.set_password(password)
         user.save()
+        
+        # Automatically create profile based on user_type
+        if user_type == 'dealer':
+            from dealers.models import Dealer
+            Dealer.objects.create(
+                user=user,
+                business_name=f"{user.first_name}'s Business" if user.first_name else f"{user.username}'s Business",
+                business_license=f"LICENSE-{user.id}-{user.username[:5]}",
+                business_category="General"
+            )
+        elif user_type == 'shopkeeper':
+            from shopkeepers.models import Shopkeeper
+            Shopkeeper.objects.create(
+                user=user,
+                shop_name=f"{user.first_name}'s Shop" if user.first_name else f"{user.username}'s Shop",
+                business_type="Retail"
+            )
+            
         return user
 
 

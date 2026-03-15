@@ -5,23 +5,23 @@ from django.conf.urls.static import static
 from rest_framework import routers
 from rest_framework.documentation import include_docs_urls
 
-# API Router
+# Global API Router
 router = routers.DefaultRouter()
 
-# Include app routers
-from users.urls import router as users_router
-from products.urls import router as products_router
-from dealers.urls import router as dealers_router
-from shopkeepers.urls import router as shopkeepers_router
-from orders.urls import router as orders_router
-from categories.urls import router as categories_router
+# Register ViewSets
+from users.views import UserViewSet
+from products.views import ProductViewSet
+from dealers.views import DealerViewSet
+from shopkeepers.views import ShopkeeperViewSet
+from orders.views import OrderViewSet
+from categories.views import CategoryViewSet
 
-router.registry.extend(users_router.registry)
-router.registry.extend(products_router.registry)
-router.registry.extend(dealers_router.registry)
-router.registry.extend(shopkeepers_router.registry)
-router.registry.extend(orders_router.registry)
-router.registry.extend(categories_router.registry)
+router.register(r'users', UserViewSet, basename='user')
+router.register(r'products', ProductViewSet, basename='product')
+router.register(r'dealers', DealerViewSet, basename='dealer')
+router.register(r'shopkeepers', ShopkeeperViewSet, basename='shopkeeper')
+router.register(r'orders', OrderViewSet, basename='order')
+router.register(r'categories', CategoryViewSet, basename='category')
 
 urlpatterns = [
     # Admin
@@ -30,16 +30,11 @@ urlpatterns = [
     # API Documentation
     path('api/docs/', include_docs_urls(title='Kirana API')),
     
-    # API Routes
-    path('api/v1/', include(router.urls)),
-    
-    # App-specific URLs
+    # Standalone API Views (Login, Register, Logout)
     path('api/v1/users/', include('users.urls')),
-    path('api/v1/products/', include('products.urls')),
-    path('api/v1/dealers/', include('dealers.urls')),
-    path('api/v1/shopkeepers/', include('shopkeepers.urls')),
-    path('api/v1/orders/', include('orders.urls')),
-    path('api/v1/categories/', include('categories.urls')),
+    
+    # Consolidated API v1
+    path('api/v1/', include(router.urls)),
 ]
 
 # Serve media files in development
