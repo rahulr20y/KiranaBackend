@@ -141,7 +141,8 @@ AUTH_USER_MODEL = 'users.User'
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:3000').split(',')
 
-# Note: Cloud Run and Firebase domains will be added here via environment variables in production.
+# Render and Vercel domains are added via environment variables in production.
+# Tip: Set CORS_ALLOWED_ORIGINS to https://your-app.vercel.app in Render Dashboard.
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
