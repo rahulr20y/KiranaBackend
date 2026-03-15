@@ -24,6 +24,8 @@ router.register(r'shopkeepers', ShopkeeperViewSet, basename='shopkeeper')
 router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'categories', CategoryViewSet, basename='category')
 
+import subprocess
+
 def home_view(request):
     return JsonResponse({
         "status": "online",
@@ -31,8 +33,24 @@ def home_view(request):
         "version": "v1"
     })
 
+def migrate_diag_view(request):
+    try:
+        result = subprocess.run(
+            ['python', 'manage.py', 'migrate', '--noinput'],
+            capture_output=True,
+            text=True
+        )
+        return JsonResponse({
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "returncode": result.returncode
+        })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
 urlpatterns = [
     path('', home_view, name='home'),
+    path('api/migrate-diag/', migrate_diag_view, name='migrate_diag'),
     # Admin
     path('admin/', admin.site.urls),
     
