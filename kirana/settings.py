@@ -137,8 +137,11 @@ REST_FRAMEWORK = {
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
 
-# CORS Configuration
+# CORS and CSRF Configuration
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:3000').split(',')
+
+# Note: Cloud Run and Firebase domains will be added here via environment variables in production.
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
