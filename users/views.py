@@ -39,13 +39,20 @@ class RegisterAPIView(APIView):
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
-            token, _ = Token.objects.get_or_create(user=user)
-            return Response({
-                'user': UserSerializer(user).data,
-                'token': token.key,
-                'message': 'User registered successfully'
-            }, status=status.HTTP_201_CREATED)
+            try:
+                user = serializer.save()
+                token, _ = Token.objects.get_or_create(user=user)
+                return Response({
+                    'user': UserSerializer(user).data,
+                    'token': token.key,
+                    'message': 'User registered successfully'
+                }, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                import traceback
+                return Response({
+                    'error': str(e),
+                    'traceback': traceback.format_exc()
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     
