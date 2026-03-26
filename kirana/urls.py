@@ -36,11 +36,17 @@ def home_view(request):
 def migrate_diag_view(request):
     import socket
     target_host = 'db.fzcqycmytrmvmtlbqovt.supabase.co'
-    resolved = None
+    pooler_host = 'aws-0-ap-south-1.pooler.supabase.com'
+    resolved = {}
     try:
-        resolved = socket.getaddrinfo(target_host, 5432)
+        resolved[target_host] = socket.getaddrinfo(target_host, 5432)
     except Exception as e:
-        resolved = f"Resolution failed: {str(e)}"
+        resolved[target_host] = f"Resolution failed: {str(e)}"
+    
+    try:
+        resolved[pooler_host] = socket.getaddrinfo(pooler_host, 6543)
+    except Exception as e:
+        resolved[pooler_host] = f"Resolution failed: {str(e)}"
 
     try:
         result = subprocess.run(
@@ -49,7 +55,6 @@ def migrate_diag_view(request):
             text=True
         )
         return JsonResponse({
-            "target_host": target_host,
             "resolved": resolved,
             "stdout": result.stdout,
             "stderr": result.stderr,
