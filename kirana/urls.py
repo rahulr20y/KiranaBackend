@@ -34,6 +34,14 @@ def home_view(request):
     })
 
 def migrate_diag_view(request):
+    import socket
+    target_host = 'db.fzcqycmytrmvmtlbqovt.supabase.co'
+    resolved = None
+    try:
+        resolved = socket.getaddrinfo(target_host, 5432)
+    except Exception as e:
+        resolved = f"Resolution failed: {str(e)}"
+
     try:
         result = subprocess.run(
             ['python', 'manage.py', 'migrate', '--noinput'],
@@ -41,12 +49,18 @@ def migrate_diag_view(request):
             text=True
         )
         return JsonResponse({
+            "target_host": target_host,
+            "resolved": resolved,
             "stdout": result.stdout,
             "stderr": result.stderr,
             "returncode": result.returncode
         })
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return JsonResponse({
+            "target_host": target_host,
+            "resolved": resolved,
+            "error": str(e)
+        }, status=500)
 
 urlpatterns = [
     path('', home_view, name='home'),

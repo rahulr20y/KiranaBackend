@@ -32,4 +32,6 @@ EXPOSE 8000
 
 # Run migrations and collectstatic, then start gunicorn
 # Use the PORT environment variable provided by Render
-CMD ["sh", "-c", "echo 'Running migrations...' && python manage.py migrate --noinput && echo 'Collecting static files...' && python manage.py collectstatic --noinput && echo 'Starting Gunicorn on port $PORT...' && gunicorn kirana.wsgi:application --bind 0.0.0.0:$PORT --workers 4"]
+# We use '|| true' to ensure the container starts even if migrations or static collection fails,
+# which allows us to access diagnostic endpoints
+CMD ["sh", "-c", "echo 'Running migrations...' && (python manage.py migrate --noinput || echo 'Migrations failed') && echo 'Collecting static files...' && (python manage.py collectstatic --noinput || echo 'Collectstatic failed') && echo 'Starting Gunicorn on port $PORT...' && gunicorn kirana.wsgi:application --bind 0.0.0.0:$PORT --workers 4"]
