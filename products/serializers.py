@@ -36,7 +36,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'image', 'is_available', 'average_rating', 'review_count',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'dealer', 'created_at', 'updated_at']
     
     def get_average_rating(self, obj):
         reviews = obj.reviews.all()
