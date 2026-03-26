@@ -23,6 +23,11 @@ class ProductSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(required=False, allow_null=True)
     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False, allow_null=True)
 
+    def validate_category(self, value):
+        if value == '':
+            return None
+        return value
+
     class Meta:
         model = Product
         fields = [
