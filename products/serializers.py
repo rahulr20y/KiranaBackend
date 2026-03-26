@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Product, ProductReview
+from categories.models import Category
 from users.serializers import UserSerializer
 from categories.serializers import CategorySerializer
 
@@ -19,6 +20,9 @@ class ProductSerializer(serializers.ModelSerializer):
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
     
+    image = serializers.ImageField(required=False, allow_null=True)
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Product
         fields = [
