@@ -72,9 +72,19 @@ WSGI_APPLICATION = 'kirana.wsgi.application'
 
 # Database
 db_url = config('DATABASE_URL', default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
-# Fix for Supabase host change in production if env var is stale
-if 'db-20260315t133413.supabase.co' in db_url:
-    db_url = db_url.replace('db-20260315t133413.supabase.co', 'db.fzcqycmytrmvmtlbqovt.supabase.co')
+
+# CRITICAL FIX for Render deployment connectivity issues
+# Direct Supabase hosts are IPv6-only, which Render does not support.
+# We force the use of the IPv4-compatible pooled connection.
+STALE_HOSTS = [
+    'db-20260315t133413.supabase.co',
+    'db.fzcqycmytrmvmtlbqovt.supabase.co',
+    'db.apbkobhfnmcqqzqeeqss.supabase.co'
+]
+
+if any(host in db_url for host in STALE_HOSTS):
+    # Overriding with the verified working pooled connection (Singapore aws-1 region)
+    db_url = "postgresql://postgres.fzcqycmytrmvmtlbqovt:Y3Th7Q6756pZlMN2@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require"
 
 DATABASES = {
     'default': dj_database_url.parse(db_url)
