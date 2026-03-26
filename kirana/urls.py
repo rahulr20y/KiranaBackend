@@ -30,7 +30,7 @@ def home_view(request):
     return JsonResponse({
         "status": "online",
         "message": "Kirana API is running",
-        "version": "v1.1"
+        "version": "v1.2"
     })
 
 def migrate_diag_view(request):
