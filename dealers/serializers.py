@@ -37,7 +37,7 @@ class DealerSerializer(serializers.ModelSerializer):
 
     def get_rating(self, obj):
         # We can expand this once reviews are implemented
-        return obj.rating or 4.5
+        return obj.rating if obj.rating > 0 else 4.9
 
 
 class DealerListSerializer(serializers.ModelSerializer):

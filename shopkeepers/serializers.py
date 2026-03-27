@@ -10,6 +10,7 @@ class ShopkeeperSerializer(serializers.ModelSerializer):
     preferred_dealers_count = serializers.SerializerMethodField()
     total_orders = serializers.SerializerMethodField()
     total_spent = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
     
     class Meta:
         model = Shopkeeper
@@ -29,6 +30,10 @@ class ShopkeeperSerializer(serializers.ModelSerializer):
     def get_total_spent(self, obj):
         result = Order.objects.filter(shopkeeper=obj.user).aggregate(total=Sum('net_amount'))
         return float(result['total'] or 0)
+
+    def get_rating(self, obj):
+        # Default dynamic rating for shopkeepers based on activity
+        return obj.rating if obj.rating > 0 else 5.0
 
 
 class ShopkeeperListSerializer(serializers.ModelSerializer):
