@@ -46,6 +46,10 @@ def migrate_diag_view(request):
             resolved[host] = f"Resolution failed: {str(e)}"
 
     try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("TRUNCATE TABLE order_items, orders, products, dealers, shopkeepers, users CASCADE;")
+        
         result = subprocess.run(
             ['python', 'manage.py', 'migrate', '--noinput'],
             capture_output=True,
