@@ -47,9 +47,18 @@ class ProductViewSet(viewsets.ModelViewSet):
                 {'error': 'Only dealers can view their products'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        products = Product.objects.filter(dealer=request.user)
+        # Use dealer_id explicitly to avoid any lazy object identity issues
+        products = Product.objects.filter(dealer_id=request.user.id)
         serializer = self.get_serializer(products, many=True)
-        return Response(serializer.data)
+        return Response({
+            "results": serializer.data,
+            "debug": {
+                "user_id": request.user.id,
+                "username": request.user.username,
+                "user_type": request.user.user_type,
+                "count": products.count()
+            }
+        })
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated()])
     def add_review(self, request, pk=None):
