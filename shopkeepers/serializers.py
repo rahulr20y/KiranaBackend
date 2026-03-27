@@ -1,11 +1,15 @@
 from rest_framework import serializers
 from .models import Shopkeeper
 from users.serializers import UserSerializer
+from orders.models import Order
+from django.db.models import Sum
 
 
 class ShopkeeperSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     preferred_dealers_count = serializers.SerializerMethodField()
+    total_orders = serializers.SerializerMethodField()
+    total_spent = serializers.SerializerMethodField()
     
     class Meta:
         model = Shopkeeper
@@ -14,10 +18,17 @@ class ShopkeeperSerializer(serializers.ModelSerializer):
             'employees_count', 'monthly_budget', 'preferred_dealers_count',
             'rating', 'total_orders', 'total_spent', 'is_verified', 'created_at'
         ]
-        read_only_fields = ['id', 'rating', 'total_orders', 'total_spent', 'created_at']
+        read_only_fields = ['id', 'created_at']
     
     def get_preferred_dealers_count(self, obj):
         return obj.preferred_dealers.count()
+
+    def get_total_orders(self, obj):
+        return Order.objects.filter(shopkeeper=obj.user).count()
+
+    def get_total_spent(self, obj):
+        result = Order.objects.filter(shopkeeper=obj.user).aggregate(total=Sum('net_amount'))
+        return float(result['total'] or 0)
 
 
 class ShopkeeperListSerializer(serializers.ModelSerializer):
