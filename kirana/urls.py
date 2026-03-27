@@ -64,9 +64,17 @@ def migrate_diag_view(request):
             "error": str(e)
         }, status=500)
 
+def wipe_db_view(request):
+    """Temporary endpoint to wipe transactional data for fresh start"""
+    from django.db import connection
+    with connection.cursor() as cursor:
+        cursor.execute("TRUNCATE TABLE order_items, orders, products, dealers, shopkeepers, users CASCADE;")
+    return JsonResponse({"message": "Database wiped successfully. Transactional data cleared."})
+
 urlpatterns = [
     path('', home_view, name='home'),
     path('api/migrate-diag/', migrate_diag_view, name='migrate_diag'),
+    path('api/wipe-db-2026/', wipe_db_view, name='wipe_db'),
     # Admin
     path('admin/', admin.site.urls),
     
