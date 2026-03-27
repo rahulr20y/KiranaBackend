@@ -45,24 +45,16 @@ def migrate_diag_view(request):
         except Exception as e:
             resolved[host] = f"Resolution failed: {str(e)}"
 
-    try:
-        result = subprocess.run(
-            ['python', 'manage.py', 'migrate', '--noinput'],
-            capture_output=True,
-            text=True
-        )
-        return JsonResponse({
-            "resolved": resolved,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "returncode": result.returncode
-        })
-    except Exception as e:
-        return JsonResponse({
-            "target_host": target_host,
-            "resolved": resolved,
-            "error": str(e)
-        }, status=500)
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    from products.models import Product
+    
+    debug_info = {
+        "resolved": resolved,
+        "users": list(User.objects.values('id', 'username', 'user_type')),
+        "products": list(Product.objects.values('id', 'name', 'dealer_id', 'is_available'))
+    }
+    return JsonResponse(debug_info)
 
 urlpatterns = [
     path('', home_view, name='home'),
