@@ -24,75 +24,25 @@ router.register(r'shopkeepers', ShopkeeperViewSet, basename='shopkeeper')
 router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'categories', CategoryViewSet, basename='category')
 
-import subprocess
-
 def home_view(request):
     return JsonResponse({
         "status": "online",
-        "message": "Kirana API is running (Stats Dynamic v1.3)",
-        "version": "v1.3"
+        "message": "Kirana API is running",
+        "version": "v1.4"
     })
-
-def migrate_diag_view(request):
-    import socket
-    target_host = 'db.fzcqycmytrmvmtlbqovt.supabase.co'
-    pooler_mumbai = 'aws-0-ap-south-1.pooler.supabase.com'
-    pooler_singapore = 'aws-1-ap-southeast-1.pooler.supabase.com'
-    resolved = {}
-    for host in [target_host, pooler_mumbai, pooler_singapore]:
-        try:
-            resolved[host] = socket.getaddrinfo(host, 5432)
-        except Exception as e:
-            resolved[host] = f"Resolution failed: {str(e)}"
-
-    try:
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute("TRUNCATE TABLE order_items, orders, products, dealers, shopkeepers, users CASCADE;")
-        
-        result = subprocess.run(
-            ['python', 'manage.py', 'migrate', '--noinput'],
-            capture_output=True,
-            text=True
-        )
-        return JsonResponse({
-            "resolved": resolved,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "returncode": result.returncode
-        })
-    except Exception as e:
-        return JsonResponse({
-            "target_host": target_host,
-            "resolved": resolved,
-            "error": str(e)
-        }, status=500)
-
-def wipe_db_view(request):
-    """Temporary endpoint to wipe transactional data for fresh start"""
-    from django.db import connection
-    with connection.cursor() as cursor:
-        cursor.execute("TRUNCATE TABLE order_items, orders, products, dealers, shopkeepers, users CASCADE;")
-    return JsonResponse({"message": "Database wiped successfully. Transactional data cleared."})
 
 urlpatterns = [
     path('', home_view, name='home'),
-    path('api/migrate-diag/', migrate_diag_view, name='migrate_diag'),
-    path('api/wipe-db-2026/', wipe_db_view, name='wipe_db'),
     # Admin
     path('admin/', admin.site.urls),
     
     # API Documentation
-    # The instruction provided a change to schema_view, but did not provide its definition or imports.
-    # Reverting to original include_docs_urls for now to maintain syntactical correctness.
     path('api/docs/', include_docs_urls(title='Kirana API')),
     
     # Standalone API Views (Login, Register, Logout)
     path('api/v1/users/', include('users.urls')),
     
     # Consolidated API v1
-    # The instruction provided a change to include individual app URLs instead of router.urls.
-    # Applying this change as requested.
     path('api/v1/', include([
         path('products/', include('products.urls')),
         path('dealers/', include('dealers.urls')),
