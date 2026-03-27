@@ -29,8 +29,8 @@ import subprocess
 def home_view(request):
     return JsonResponse({
         "status": "online",
-        "message": "Kirana API is running",
-        "version": "v1.2"
+        "message": "Kirana API is running (Stats Dynamic v1.3)",
+        "version": "v1.3"
     })
 
 def migrate_diag_view(request):
