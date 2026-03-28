@@ -52,23 +52,30 @@ class OrderViewSet(viewsets.ModelViewSet):
             discount = float(serializer.validated_data.get('discount', 0))
             net_amount = total_amount - discount
             
-            # Get dealer from first product in items
-            dealer_id = request.data.get('dealer_id')
-            if not dealer_id:
-                return Response(
-                    {'error': 'dealer_id is required'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            try:
-                dealer = User.objects.get(id=dealer_id, user_type='dealer')
-            except User.DoesNotExist:
-                return Response(
-                    {'error': 'Dealer not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+            # Logic for dealer-initiated or shopkeeper-initiated order
+            if request.user.user_type == 'dealer':
+                dealer = request.user
+                shopkeeper_id = request.data.get('shopkeeper_id')
+                if not shopkeeper_id:
+                    return Response({'error': 'shopkeeper_id is required for dealer-initiated sales'}, status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    shopkeeper = User.objects.get(id=shopkeeper_id, user_type='shopkeeper')
+                except User.DoesNotExist:
+                    return Response({'error': 'Shopkeeper not found'}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                # Shopkeeper-initiated order
+                shopkeeper = request.user
+                dealer_id = request.data.get('dealer_id')
+                if not dealer_id:
+                    return Response({'error': 'dealer_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    dealer = User.objects.get(id=dealer_id, user_type='dealer')
+                except User.DoesNotExist:
+                    return Response({'error': 'Dealer not found'}, status=status.HTTP_404_NOT_FOUND)
             
             try:
                 with transaction.atomic():
@@ -87,10 +94,21 @@ class OrderViewSet(viewsets.ModelViewSet):
                         product.stock_quantity -= quantity
                         product.save()
 
+                        # Low Stock Alert
+                        if product.stock_quantity <= product.low_stock_threshold:
+                            from notifications.models import UserNotification
+                            UserNotification.objects.get_or_create(
+                                user=product.dealer,
+                                title="Low Stock Alert! ⚠️",
+                                message=f"Product '{product.name}' is running low. Current stock: {product.stock_quantity} {product.unit}",
+                                notification_type="low_stock",
+                                is_read=False
+                            )
+
                     # Create order
                     order = Order.objects.create(
                         order_number=order_number,
-                        shopkeeper=request.user,
+                        shopkeeper=shopkeeper,
                         dealer=dealer,
                         total_amount=total_amount,
                         discount=discount,

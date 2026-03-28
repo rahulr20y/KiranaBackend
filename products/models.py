@@ -14,6 +14,7 @@ class Product(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     unit = models.CharField(max_length=50, default='kg')  # kg, liter, piece, box, etc
     stock_quantity = models.IntegerField(default=0)
+    low_stock_threshold = models.IntegerField(default=10)
     image = models.ImageField(upload_to='product_images/', blank=True, null=True)
     is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

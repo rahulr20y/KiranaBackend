@@ -67,6 +67,8 @@ urlpatterns = [
         path('shopkeepers/', include('shopkeepers.urls')),
         path('orders/', include('orders.urls')),
         path('categories/', include('categories.urls')),
+        path('notifications/', include('notifications.urls')),
+        path('payments/', include('payments.urls')),
     ])),
     
     # Diagnostic

@@ -87,8 +87,13 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
             shopkeeper = request.user.shopkeeper_profile
             dealer_id = request.data.get('dealer_id') or request.query_params.get('dealer_id')
             if dealer_id:
-                shopkeeper.preferred_dealers.add(dealer_id)
-                return Response({'message': 'Dealer followed'})
+                from dealers.models import Dealer
+                try:
+                    dealer = Dealer.objects.get(id=dealer_id)
+                    shopkeeper.preferred_dealers.add(dealer.user)
+                    return Response({'message': 'Dealer followed'})
+                except Dealer.DoesNotExist:
+                    return Response({'error': 'Dealer not found'}, status=status.HTTP_404_NOT_FOUND)
             return Response({'error': 'dealer_id required'}, status=status.HTTP_400_BAD_REQUEST)
         except Shopkeeper.DoesNotExist:
             return Response(
@@ -103,8 +108,13 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
             shopkeeper = request.user.shopkeeper_profile
             dealer_id = request.data.get('dealer_id') or request.query_params.get('dealer_id')
             if dealer_id:
-                shopkeeper.preferred_dealers.remove(dealer_id)
-                return Response({'message': 'Dealer unfollowed'})
+                from dealers.models import Dealer
+                try:
+                    dealer = Dealer.objects.get(id=dealer_id)
+                    shopkeeper.preferred_dealers.remove(dealer.user)
+                    return Response({'message': 'Dealer unfollowed'})
+                except Dealer.DoesNotExist:
+                    return Response({'message': 'Dealer unfollowed'})
             return Response({'error': 'dealer_id required'}, status=status.HTTP_400_BAD_REQUEST)
         except Shopkeeper.DoesNotExist:
             return Response(
@@ -117,7 +127,10 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
         """Get shopkeeper's followed dealers"""
         try:
             shopkeeper = request.user.shopkeeper_profile
-            dealers = shopkeeper.preferred_dealers.all()
+            # preferred_dealers contains Users, but we want Dealer profiles
+            dealer_users = shopkeeper.preferred_dealers.all()
+            from dealers.models import Dealer
+            dealers = Dealer.objects.filter(user__in=dealer_users)
             from dealers.serializers import DealerListSerializer
             serializer = DealerListSerializer(dealers, many=True)
             return Response(serializer.data)

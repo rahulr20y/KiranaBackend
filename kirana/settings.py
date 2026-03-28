@@ -36,6 +36,8 @@ INSTALLED_APPS = [
     'shopkeepers.apps.ShopkeepersConfig',
     'orders.apps.OrdersConfig',
     'categories.apps.CategoriesConfig',
+    'notifications.apps.NotificationsConfig',
+    'payments.apps.PaymentsConfig',
 ]
 
 MIDDLEWARE = [
