@@ -29,7 +29,7 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
             return [AllowAny()]
         return [IsAuthenticated()]
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_profile(self, request):
         """Get current shopkeeper's profile, create if it doesn't exist"""
         if request.user.user_type != 'shopkeeper':
@@ -51,7 +51,7 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
         serializer = ShopkeeperSerializer(shopkeeper)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def create_profile(self, request):
         """Create shopkeeper profile"""
         if hasattr(request.user, 'shopkeeper_profile'):
@@ -64,7 +64,7 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
         serializer = ShopkeeperSerializer(shopkeeper)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
-    @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated])
     def update_profile(self, request):
         """Update shopkeeper profile"""
         try:
@@ -80,7 +80,7 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
     
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def follow_dealer(self, request):
         """Follow a dealer"""
         try:
@@ -96,7 +96,7 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
     
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def unfollow_dealer(self, request):
         """Unfollow a dealer"""
         try:
@@ -112,7 +112,7 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_followed_dealers(self, request):
         """Get shopkeeper's followed dealers"""
         try:

@@ -53,6 +53,7 @@ services:
       DB_PORT: 5432
       CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000
       REDIS_URL: redis://redis:6379/0
+      FIREBASE_PROJECT_ID: kirana-17796
     ports:
       - "8000:8000"
     volumes:
@@ -65,7 +66,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -82,11 +83,27 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+        NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyAgO7HH0b7E8Iosab1aQuKxf261jjk0zCU
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: kirana-17796.firebaseapp.com
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: kirana-17796
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: kirana-17796.firebasestorage.app
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "373126161593"
+        NEXT_PUBLIC_FIREBASE_APP_ID: 1:373126161593:web:f88401db6bf505913da768
+        NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: G-PS7ZCVTEFK
     container_name: kirana-frontend
     ports:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyAgO7HH0b7E8Iosab1aQuKxf261jjk0zCU
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: kirana-17796.firebaseapp.com
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: kirana-17796
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: kirana-17796.firebasestorage.app
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "373126161593"
+      NEXT_PUBLIC_FIREBASE_APP_ID: 1:373126161593:web:f88401db6bf505913da768
+      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: G-PS7ZCVTEFK
     depends_on:
       - backend
     healthcheck:

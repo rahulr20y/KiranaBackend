@@ -29,7 +29,7 @@ class DealerViewSet(viewsets.ModelViewSet):
             return [AllowAny()]
         return [IsAuthenticated()]
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_profile(self, request):
         """Get current dealer's profile, create if it doesn't exist"""
         if request.user.user_type != 'dealer':
@@ -52,7 +52,7 @@ class DealerViewSet(viewsets.ModelViewSet):
         serializer = DealerSerializer(dealer)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def create_profile(self, request):
         """Create dealer profile"""
         if hasattr(request.user, 'dealer_profile'):
@@ -65,7 +65,7 @@ class DealerViewSet(viewsets.ModelViewSet):
         serializer = DealerSerializer(dealer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
-    @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated])
     def update_profile(self, request):
         """Update dealer profile"""
         try:
@@ -81,7 +81,7 @@ class DealerViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
     
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def upload_document(self, request):
         """Upload dealer verification document"""
         try:
@@ -97,7 +97,7 @@ class DealerViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_documents(self, request):
         """Get dealer's documents"""
         try:

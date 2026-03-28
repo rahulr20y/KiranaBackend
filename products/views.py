@@ -39,7 +39,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_products(self, request):
         """Get products of the current dealer"""
         if request.user.user_type != 'dealer':
@@ -60,7 +60,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             }
         })
     
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated()])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def add_review(self, request, pk=None):
         """Add a review to a product"""
         product = self.get_object()

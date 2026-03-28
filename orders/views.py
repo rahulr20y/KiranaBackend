@@ -90,7 +90,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated()])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def cancel(self, request, pk=None):
         """Cancel an order"""
         order = self.get_object()
@@ -117,7 +117,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             'message': 'Order cancelled successfully'
         })
     
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated()])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def update_status(self, request, pk=None):
         """Update order status (only dealer can do this)"""
         order = self.get_object()
@@ -144,14 +144,14 @@ class OrderViewSet(viewsets.ModelViewSet):
             'message': f'Order status updated to {new_status}'
         })
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_orders(self, request):
         """Get current user's orders"""
         orders = self.get_queryset()
         serializer = OrderListSerializer(orders, many=True)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated()])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def stats(self, request):
         """Get order statistics"""
         orders = self.get_queryset()
