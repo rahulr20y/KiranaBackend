@@ -37,7 +37,9 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Order.objects.none()
     
     def create(self, request, *args, **kwargs):
-        """Create a new order"""
+        """Create a new order and deduct stock"""
+        from django.db import transaction
+        
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             items_data = serializer.validated_data['items']
@@ -51,7 +53,6 @@ class OrderViewSet(viewsets.ModelViewSet):
             net_amount = total_amount - discount
             
             # Get dealer from first product in items
-            # For now, we'll require dealer to be specified
             dealer_id = request.data.get('dealer_id')
             if not dealer_id:
                 return Response(
@@ -69,30 +70,56 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # Create order
-            order = Order.objects.create(
-                order_number=order_number,
-                shopkeeper=request.user,
-                dealer=dealer,
-                total_amount=total_amount,
-                discount=discount,
-                net_amount=net_amount,
-                shipping_address=serializer.validated_data['shipping_address'],
-                notes=serializer.validated_data.get('notes', '')
-            )
+            try:
+                with transaction.atomic():
+                    # Check and deduct stock
+                    for item_data in items_data:
+                        product = item_data['product']
+                        quantity = item_data['quantity']
+                        
+                        if product.stock_quantity < quantity:
+                            return Response(
+                                {'error': f'Insufficient stock for {product.name}. Available: {product.stock_quantity}'},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+                        
+                        # Deduct stock
+                        product.stock_quantity -= quantity
+                        product.save()
+
+                    # Create order
+                    order = Order.objects.create(
+                        order_number=order_number,
+                        shopkeeper=request.user,
+                        dealer=dealer,
+                        total_amount=total_amount,
+                        discount=discount,
+                        net_amount=net_amount,
+                        shipping_address=serializer.validated_data['shipping_address'],
+                        notes=serializer.validated_data.get('notes', '')
+                    )
+                    
+                    # Create order items
+                    for item_data in items_data:
+                        OrderItem.objects.create(order=order, **item_data)
+                    
+                    # Log the stock change or update stats could go here
+                
+                output_serializer = OrderSerializer(order)
+                return Response(output_serializer.data, status=status.HTTP_201_CREATED)
             
-            # Create order items
-            for item_data in items_data:
-                OrderItem.objects.create(order=order, **item_data)
-            
-            output_serializer = OrderSerializer(order)
-            return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def cancel(self, request, pk=None):
-        """Cancel an order"""
+        """Cancel an order and return stock"""
+        from django.db import transaction
         order = self.get_object()
         
         # Only shopkeeper or dealer can cancel their orders
@@ -107,14 +134,27 @@ class OrderViewSet(viewsets.ModelViewSet):
                 {'error': 'Order is already cancelled'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        order.status = 'cancelled'
-        order.save()
+            
+        try:
+            with transaction.atomic():
+                # Revert stock
+                for item in order.items.all():
+                    if item.product:
+                        item.product.stock_quantity += item.quantity
+                        item.product.save()
+                
+                order.status = 'cancelled'
+                order.save()
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to cancel order: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         serializer = OrderSerializer(order)
         return Response({
             'data': serializer.data,
-            'message': 'Order cancelled successfully'
+            'message': 'Order cancelled successfully and stock restored'
         })
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
