@@ -28,8 +28,26 @@ def home_view(request):
     return JsonResponse({
         "status": "online",
         "message": "Kirana API is running",
-        "version": "v1.4"
+        "version": "v1.8 [STABLE]"
     })
+
+def migrate_diag_view(request):
+    from django.db import connection
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            row = cursor.fetchone()
+        return JsonResponse({
+            "status": "success",
+            "db_connected": True,
+            "message": "Database connection verified",
+            "result": row[0]
+        })
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e)
+        }, status=500)
 
 urlpatterns = [
     path('', home_view, name='home'),
@@ -50,6 +68,9 @@ urlpatterns = [
         path('orders/', include('orders.urls')),
         path('categories/', include('categories.urls')),
     ])),
+    
+    # Diagnostic
+    path('api/migrate-diag/', migrate_diag_view, name='migrate-diag'),
 ]
 
 # Serve media files in development
