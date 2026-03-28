@@ -31,6 +31,76 @@ class PaymentViewSet(viewsets.ModelViewSet):
             serializer.save(dealer=user)
 
     @action(detail=False, methods=['get'])
+    def detailed_ledger(self, request):
+        """Get a detailed chronological list of all orders and payments (Passbook view)"""
+        user = request.user
+        partner_id = request.query_params.get('partner_id')
+        
+        if not partner_id:
+            return Response({'error': 'partner_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from users.models import User as UserModel
+        partner = UserModel.objects.filter(id=partner_id).first()
+        if not partner:
+            return Response({'error': 'Partner not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+        if user.user_type == 'dealer':
+            dealer = user
+            shopkeeper = partner
+        else:
+            dealer = partner
+            shopkeeper = user
+            
+        # Get all orders
+        orders = Order.objects.filter(dealer=dealer, shopkeeper=shopkeeper, status__in=['confirmed', 'shipped', 'delivered', 'pending', 'completed'])
+        # Get all payments
+        payments = Payment.objects.filter(dealer=dealer, shopkeeper=shopkeeper)
+        
+        # Merge and sort
+        history = []
+        for order in orders:
+            history.append({
+                'type': 'order',
+                'id': order.id,
+                'date': order.created_at,
+                'amount': float(order.total_amount),
+                'reference': f"Order #{order.order_number or order.id}",
+                'status': order.status
+            })
+            
+        for payment in payments:
+            history.append({
+                'type': 'payment',
+                'id': payment.id,
+                'date': payment.payment_date,
+                'amount': float(payment.amount),
+                'reference': f"Payment ({payment.payment_method})",
+                'status': 'paid'
+            })
+            
+        # Sort by date
+        history.sort(key=lambda x: x['date'])
+        
+        # Calculate running balance
+        running_balance = 0
+        for item in history:
+            if item['type'] == 'order':
+                running_balance += item['amount']
+            else:
+                running_balance -= item['amount']
+            item['balance_after'] = running_balance
+            
+        return Response({
+            'partner': {
+                'id': partner.id,
+                'username': partner.username,
+                'business_name': getattr(partner, 'dealer_profile').business_name if hasattr(partner, 'dealer_profile') else getattr(partner, 'shopkeeper_profile').shop_name if hasattr(partner, 'shopkeeper_profile') else partner.username
+            },
+            'history': history,
+            'current_balance': running_balance
+        })
+
+    @action(detail=False, methods=['get'])
     def summary(self, request):
         """Get summary of total orders, payments, and balance for current user"""
         user = request.user

@@ -1,8 +1,11 @@
+import csv
+import io
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.parsers import MultiPartParser
 from .models import Product, ProductReview
 from .serializers import ProductSerializer, ProductDetailSerializer, ProductReviewSerializer
 
@@ -16,6 +19,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'description', 'category__name']
     ordering_fields = ['price', 'created_at', 'stock_quantity']
     ordering = ['-created_at']
+    parser_classes = [MultiPartParser] + viewsets.ModelViewSet.parser_classes
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -59,6 +63,58 @@ class ProductViewSet(viewsets.ModelViewSet):
                 "count": products.count()
             }
         })
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def bulk_import(self, request):
+        """Import products from CSV"""
+        if request.user.user_type != 'dealer':
+            return Response(
+                {'error': 'Only dealers can import products'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            decoded_file = file.read().decode('utf-8')
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string)
+            
+            products_created = 0
+            errors = []
+            
+            for row in reader:
+                try:
+                    # Basic validation
+                    name = row.get('name')
+                    price = row.get('price')
+                    stock = row.get('stock_quantity', row.get('stock', 0))
+                    
+                    if not name or not price:
+                        errors.append(f"Skipping row: Missing name or price - {row}")
+                        continue
+                        
+                    Product.objects.create(
+                        dealer=request.user,
+                        name=name,
+                        description=row.get('description', ''),
+                        price=price,
+                        stock_quantity=stock,
+                        low_stock_threshold=row.get('low_stock_threshold', 10),
+                    )
+                    products_created += 1
+                except Exception as e:
+                    errors.append(f"Error in row {row}: {str(e)}")
+                    
+            return Response({
+                'message': f'Successfully imported {products_created} products',
+                'errors': errors
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({'error': f'Failed to process file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def add_review(self, request, pk=None):
