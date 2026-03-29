@@ -4,7 +4,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.utils.text import slugify
+from django.db.models import Sum, Count, F
+from django.db.models.functions import TruncDate
 import uuid
+import datetime
 from .models import Order, OrderItem
 from .serializers import OrderSerializer, OrderListSerializer, OrderCreateSerializer, OrderItemSerializer
 from notifications.utils import send_user_notification
@@ -247,8 +250,11 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def stats(self, request):
-        """Get order statistics"""
+        """Get advanced order statistics if user is dealer"""
         orders = self.get_queryset()
+        user = request.user
+        
+        # Base stats (counts)
         stats = {
             'total_orders': orders.count(),
             'pending': orders.filter(status='pending').count(),
@@ -256,6 +262,44 @@ class OrderViewSet(viewsets.ModelViewSet):
             'shipped': orders.filter(status='shipped').count(),
             'delivered': orders.filter(status='delivered').count(),
             'cancelled': orders.filter(status='cancelled').count(),
-            'total_amount': sum(float(o.net_amount) for o in orders),
+            'total_amount': orders.aggregate(total=Sum('net_amount'))['total'] or 0,
         }
+        
+        # Advanced Dealer Stats
+        if user.user_type == 'dealer':
+            # 1. Sales Trends (Last 30 days)
+            last_30_days = datetime.date.today() - datetime.timedelta(days=30)
+            sales_trends = orders.filter(
+                created_at__date__gte=last_30_days
+            ).annotate(
+                date=TruncDate('created_at')
+            ).values('date').annotate(
+                total=Sum('net_amount'),
+                count=Count('id')
+            ).order_by('date')
+            
+            stats['sales_trends'] = list(sales_trends)
+            
+            # 2. Top Selling Products (Top 5)
+            from .models import OrderItem
+            top_products = OrderItem.objects.filter(
+                order__dealer=user
+            ).values(
+                'product__name'
+            ).annotate(
+                total_qty=Sum('quantity'),
+                total_revenue=Sum('subtotal')
+            ).order_by('-total_revenue')[:5]
+            
+            stats['top_products'] = list(top_products)
+            
+            # 3. Inventory Summary from Products API (for convenience)
+            from products.models import Product
+            my_products = Product.objects.filter(dealer=user)
+            stats['inventory_health'] = {
+                'total_items': my_products.count(),
+                'low_stock_items': my_products.filter(stock_quantity__lte=F('low_stock_threshold')).count(),
+                'out_of_stock': my_products.filter(stock_quantity=0).count()
+            }
+            
         return Response(stats)
