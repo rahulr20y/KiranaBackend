@@ -9,11 +9,12 @@ from .models import Payment
 from .serializers import PaymentSerializer
 from orders.models import Order
 
+# Razorpay configuration
+RAZORPAY_KEY_ID = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_test_simulated')
+RAZORPAY_KEY_SECRET = getattr(settings, 'RAZORPAY_KEY_SECRET', 'simulated_secret')
+
 # Razorpay client
-client = razorpay.Client(auth=(
-    getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_test_simulated'), 
-    getattr(settings, 'RAZORPAY_KEY_SECRET', 'simulated_secret')
-))
+client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 class PaymentViewSet(viewsets.ModelViewSet):
     """ViewSet for managing payments and ledger balance"""
@@ -194,13 +195,22 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if not amount or not dealer_id:
             return Response({'error': 'amount and dealer_id are required'}, status=status.HTTP_400_BAD_REQUEST)
             
-        # Create Razorpay order
-        # amount is in paise (e.g., 10000 = 100.00 INR)
-        razorpay_order = client.order.create({
-            'amount': int(float(amount) * 100),
-            'currency': 'INR',
-            'payment_capture': 1
-        })
+        # Mock response if we are using placeholder keys (for testing)
+        if RAZORPAY_KEY_ID == 'rzp_test_simulated' or not RAZORPAY_KEY_ID:
+            razorpay_order = {
+                'id': f'order_mock_{user.id}_{int(float(amount))}',
+                'amount': int(float(amount) * 100),
+                'currency': 'INR',
+                'status': 'created'
+            }
+        else:
+            # Create Razorpay order via SDK
+            # amount is in paise (e.g., 10000 = 100.00 INR)
+            razorpay_order = client.order.create({
+                'amount': int(float(amount) * 100),
+                'currency': 'INR',
+                'payment_capture': 1
+            })
         
         # Save pending payment in our DB
         payment = Payment.objects.create(
@@ -217,10 +227,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
             'razorpay_order_id': razorpay_order['id'],
             'amount': amount,
             'id': payment.id
-        })
+        }, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['post'])
-    def verify_payment(self, request):
+    @action(detail=False, methods=['post'], url_path='verify')
+    def verify_razorpay_payment(self, request):
         """Verify the signature returned by Razorpay after a successful payment"""
         razorpay_order_id = request.data.get('razorpay_order_id')
         razorpay_payment_id = request.data.get('razorpay_payment_id')

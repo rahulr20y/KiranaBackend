@@ -1,0 +1,8 @@
+Need to install the following packages:
+cypress@15.13.0
+Ok to proceed? (y) 
+  #  npm exec cypress run --spec cypress/e2e/payment_gateway.cy.js[28231]: void node::ResetStdio() at ../src/node.cc:751
+  #  Assertion failed: !(err != 0) || (err == -1 && (*__errno_location ()) == 1)
+
+----- Native stack trace -----
+
