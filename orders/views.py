@@ -7,6 +7,7 @@ from django.utils.text import slugify
 import uuid
 from .models import Order, OrderItem
 from .serializers import OrderSerializer, OrderListSerializer, OrderCreateSerializer, OrderItemSerializer
+from notifications.utils import send_user_notification
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -108,13 +109,11 @@ class OrderViewSet(viewsets.ModelViewSet):
 
                         # Low Stock Alert
                         if product.stock_quantity <= product.low_stock_threshold:
-                            from notifications.models import UserNotification
-                            UserNotification.objects.get_or_create(
+                            send_user_notification(
                                 user=product.dealer,
                                 title="Low Stock Alert! ⚠️",
-                                message=f"Product '{product.name}' is running low. Current stock: {product.stock_quantity} {product.unit}",
-                                notification_type="low_stock",
-                                is_read=False
+                                message=f"Product '{product.name}' is running low. Current stock: {product.stock_quantity}",
+                                notification_type="low_stock"
                             )
 
                     # Create order
@@ -134,6 +133,14 @@ class OrderViewSet(viewsets.ModelViewSet):
                         OrderItem.objects.create(order=order, **item_data)
                     
                     # Log the stock change or update stats could go here
+                    
+                    # Notify Dealer about new order
+                    send_user_notification(
+                        user=dealer,
+                        title="New Order Received! 📦",
+                        message=f"New order #{order_number} for ₹{net_amount}",
+                        notification_type="order_update"
+                    )
                 
                 output_serializer = OrderSerializer(order)
                 return Response(output_serializer.data, status=status.HTTP_201_CREATED)
@@ -175,6 +182,15 @@ class OrderViewSet(viewsets.ModelViewSet):
                 
                 order.status = 'cancelled'
                 order.save()
+                
+                # Notify the other party
+                other_party = order.dealer if request.user == order.shopkeeper else order.shopkeeper
+                send_user_notification(
+                    user=other_party,
+                    title="Order Cancelled ❌",
+                    message=f"Order #{order.order_number} has been cancelled",
+                    notification_type="order_update"
+                )
         except Exception as e:
             return Response(
                 {'error': f'Failed to cancel order: {str(e)}'},
@@ -207,6 +223,14 @@ class OrderViewSet(viewsets.ModelViewSet):
         
         order.status = new_status
         order.save()
+        
+        # Notify Shopkeeper about status update
+        send_user_notification(
+            user=order.shopkeeper,
+            title="Order Status Updated! 🚚",
+            message=f"Order #{order.order_number} is now {new_status}",
+            notification_type="order_update"
+        )
         
         serializer = OrderSerializer(order)
         return Response({

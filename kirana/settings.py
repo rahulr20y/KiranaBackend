@@ -16,6 +16,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0').s
 
 # Application definition
 INSTALLED_APPS = [
+    'daphne',
     # Django default apps
     'django.contrib.admin',
     'django.contrib.auth',
@@ -28,6 +29,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
+    'channels',
     
     # Local apps
     'users.apps.UsersConfig',
@@ -71,6 +73,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'kirana.wsgi.application'
+ASGI_APPLICATION = 'kirana.asgi.application'
 
 # Database Configuration
 # We use the DATABASE_URL environment variable if provided, else fallback to sqlite
@@ -196,5 +199,16 @@ LOGGING = {
     'root': {
         'handlers': ['console'],
         'level': 'INFO',
+    },
+}
+
+# Channel layers for WebSockets
+REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [REDIS_URL],
+        },
     },
 }
