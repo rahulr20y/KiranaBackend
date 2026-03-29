@@ -11,7 +11,8 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = [
             'id', 'shopkeeper', 'dealer', 'amount', 'order',
-            'payment_date', 'payment_method', 'transaction_id',
-            'notes', 'shopkeeper_name', 'dealer_name', 'order_number'
+            'payment_date', 'payment_method', 'status', 
+            'razorpay_order_id', 'razorpay_payment_id', 'razorpay_signature',
+            'transaction_id', 'notes', 'shopkeeper_name', 'dealer_name', 'order_number'
         ]
-        read_only_fields = ['id', 'payment_date']
+        read_only_fields = ['id', 'payment_date', 'razorpay_order_id']

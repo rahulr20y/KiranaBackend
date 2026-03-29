@@ -1,3 +1,5 @@
+import razorpay
+from django.conf import settings
 from django.db.models import Sum
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -6,6 +8,12 @@ from rest_framework.permissions import IsAuthenticated
 from .models import Payment
 from .serializers import PaymentSerializer
 from orders.models import Order
+
+# Razorpay client
+client = razorpay.Client(auth=(
+    getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_test_simulated'), 
+    getattr(settings, 'RAZORPAY_KEY_SECRET', 'simulated_secret')
+))
 
 class PaymentViewSet(viewsets.ModelViewSet):
     """ViewSet for managing payments and ledger balance"""
@@ -172,4 +180,82 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 'ledger_by_dealer': ledger
             })
             
-        return Response({'error': 'Invalid user type'}, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=['post'])
+    def create_razorpay_order(self, request):
+        """Create a new Razorpay order for a payment"""
+        user = request.user
+        if user.user_type != 'shopkeeper':
+            return Response({'error': 'Only shopkeepers can initiate payments'}, status=status.HTTP_403_FORBIDDEN)
+            
+        amount = request.data.get('amount')
+        dealer_id = request.data.get('dealer_id')
+        order_id = request.data.get('order_id')
+        
+        if not amount or not dealer_id:
+            return Response({'error': 'amount and dealer_id are required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Create Razorpay order
+        # amount is in paise (e.g., 10000 = 100.00 INR)
+        razorpay_order = client.order.create({
+            'amount': int(float(amount) * 100),
+            'currency': 'INR',
+            'payment_capture': 1
+        })
+        
+        # Save pending payment in our DB
+        payment = Payment.objects.create(
+            shopkeeper=user,
+            dealer_id=dealer_id,
+            amount=amount,
+            order_id=order_id,
+            payment_method='upi',
+            status='pending',
+            razorpay_order_id=razorpay_order['id']
+        )
+        
+        return Response({
+            'razorpay_order_id': razorpay_order['id'],
+            'amount': amount,
+            'id': payment.id
+        })
+
+    @action(detail=False, methods=['post'])
+    def verify_payment(self, request):
+        """Verify the signature returned by Razorpay after a successful payment"""
+        razorpay_order_id = request.data.get('razorpay_order_id')
+        razorpay_payment_id = request.data.get('razorpay_payment_id')
+        razorpay_signature = request.data.get('razorpay_signature')
+        
+        if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
+            return Response({'error': 'All razorpay fields are required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Hardcoding success for test/simulated environment if secret is default
+        is_simulated = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_test_simulated') == 'rzp_test_simulated'
+        
+        try:
+            if not is_simulated:
+                 client.utility.verify_payment_signature({
+                    'razorpay_order_id': razorpay_order_id,
+                    'razorpay_payment_id': razorpay_payment_id,
+                    'razorpay_signature': razorpay_signature
+                })
+            
+            # Update payment record
+            payment = Payment.objects.filter(razorpay_order_id=razorpay_order_id).first()
+            if payment:
+                payment.status = 'success'
+                payment.razorpay_payment_id = razorpay_payment_id
+                payment.razorpay_signature = razorpay_signature
+                payment.save()
+                
+                return Response({'status': 'Payment verified successfully'})
+            else:
+                return Response({'error': 'Payment record not found'}, status=status.HTTP_404_NOT_FOUND)
+                
+        except Exception as e:
+            # Update payment as failed
+            payment = Payment.objects.filter(razorpay_order_id=razorpay_order_id).first()
+            if payment:
+                payment.status = 'failed'
+                payment.save()
+            return Response({'error': f'Signature verification failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)

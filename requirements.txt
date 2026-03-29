@@ -16,3 +16,4 @@ dj-database-url==2.1.0
 django-storages[google]==1.14.2
 whitenoise==6.6.0
 google-auth==2.29.0
+razorpay==1.4.1
