@@ -59,11 +59,17 @@ class OrderViewSet(viewsets.ModelViewSet):
                 if not shopkeeper_id:
                     return Response({'error': 'shopkeeper_id is required for dealer-initiated sales'}, status=status.HTTP_400_BAD_REQUEST)
                 try:
+                    from shopkeepers.models import Shopkeeper
+                    shopkeeper_profile = Shopkeeper.objects.get(id=shopkeeper_id)
+                    shopkeeper = shopkeeper_profile.user
+                except Shopkeeper.DoesNotExist:
+                    # Fallback to User ID if profile PK doesn't match
                     from django.contrib.auth import get_user_model
                     User = get_user_model()
-                    shopkeeper = User.objects.get(id=shopkeeper_id, user_type='shopkeeper')
-                except User.DoesNotExist:
-                    return Response({'error': 'Shopkeeper not found'}, status=status.HTTP_404_NOT_FOUND)
+                    try:
+                        shopkeeper = User.objects.get(id=shopkeeper_id, user_type='shopkeeper')
+                    except User.DoesNotExist:
+                        return Response({'error': 'Shopkeeper not found'}, status=status.HTTP_404_NOT_FOUND)
             else:
                 # Shopkeeper-initiated order
                 shopkeeper = request.user
@@ -71,11 +77,17 @@ class OrderViewSet(viewsets.ModelViewSet):
                 if not dealer_id:
                     return Response({'error': 'dealer_id is required'}, status=status.HTTP_400_BAD_REQUEST)
                 try:
+                    from dealers.models import Dealer
+                    dealer_profile = Dealer.objects.get(id=dealer_id)
+                    dealer = dealer_profile.user
+                except Dealer.DoesNotExist:
+                    # Fallback to User ID if profile PK doesn't match
                     from django.contrib.auth import get_user_model
                     User = get_user_model()
-                    dealer = User.objects.get(id=dealer_id, user_type='dealer')
-                except User.DoesNotExist:
-                    return Response({'error': 'Dealer not found'}, status=status.HTTP_404_NOT_FOUND)
+                    try:
+                        dealer = User.objects.get(id=dealer_id, user_type='dealer')
+                    except User.DoesNotExist:
+                        return Response({'error': 'Dealer not found'}, status=status.HTTP_404_NOT_FOUND)
             
             try:
                 with transaction.atomic():

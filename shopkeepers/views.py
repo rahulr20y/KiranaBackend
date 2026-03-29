@@ -12,6 +12,7 @@ class ShopkeeperViewSet(viewsets.ModelViewSet):
     queryset = Shopkeeper.objects.select_related('user')
     serializer_class = ShopkeeperSerializer
     permission_classes = [AllowAny]
+    pagination_class = None
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['shop_name', 'business_type']
     ordering_fields = ['rating', 'total_orders', 'created_at']

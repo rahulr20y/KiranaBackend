@@ -12,10 +12,11 @@ class DealerViewSet(viewsets.ModelViewSet):
     queryset = Dealer.objects.select_related('user').filter(is_banned=False)
     serializer_class = DealerSerializer
     permission_classes = [AllowAny]
+    pagination_class = None
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['business_name', 'business_category']
     ordering_fields = ['rating', 'total_orders', 'created_at']
-    ordering = ['-rating']
+    ordering = ['-id']
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
