@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Payment
+from .models import Payment, CreditLimit
 from users.serializers import UserSerializer
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -16,3 +16,15 @@ class PaymentSerializer(serializers.ModelSerializer):
             'transaction_id', 'notes', 'shopkeeper_name', 'dealer_name', 'order_number'
         ]
         read_only_fields = ['id', 'payment_date', 'razorpay_order_id']
+
+class CreditLimitSerializer(serializers.ModelSerializer):
+    shopkeeper_name = serializers.CharField(source='shopkeeper.username', read_only=True)
+    dealer_name = serializers.CharField(source='dealer.username', read_only=True)
+
+    class Meta:
+        model = CreditLimit
+        fields = [
+            'id', 'dealer', 'dealer_name', 'shopkeeper', 
+            'shopkeeper_name', 'limit_amount', 'notes', 'updated_at'
+        ]
+        read_only_fields = ['id', 'dealer', 'updated_at']

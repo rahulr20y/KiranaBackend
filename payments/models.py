@@ -39,3 +39,18 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment of {self.amount} from {self.shopkeeper.username} to {self.dealer.username}"
+
+class CreditLimit(models.Model):
+    """Credit limit set by a dealer for a specific shopkeeper"""
+    dealer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='given_credit_limits')
+    shopkeeper = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_credit_limits')
+    limit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    notes = models.TextField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'credit_limits'
+        unique_together = ['dealer', 'shopkeeper']
+
+    def __str__(self):
+        return f"Limit of {self.limit_amount} for {self.shopkeeper.username} by {self.dealer.username}"

@@ -1,12 +1,12 @@
 import razorpay
 from django.conf import settings
 from django.db.models import Sum
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import Payment
-from .serializers import PaymentSerializer
+from .models import Payment, CreditLimit
+from .serializers import PaymentSerializer, CreditLimitSerializer
 from orders.models import Order
 
 # Razorpay configuration
@@ -132,13 +132,15 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 if not sk: continue
                 sk_orders = Order.objects.filter(dealer=user, shopkeeper=sk, status__in=['confirmed', 'shipped', 'delivered', 'pending']).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
                 sk_payments = Payment.objects.filter(dealer=user, shopkeeper=sk).aggregate(Sum('amount'))['amount__sum'] or 0
+                sk_credit = CreditLimit.objects.filter(dealer=user, shopkeeper=sk).first()
                 ledger.append({
                     'shopkeeper_id': sk.id,
                     'shopkeeper_name': sk.username,
                     'business_name': sk.shopkeeper_profile.shop_name if hasattr(sk, 'shopkeeper_profile') else sk.username,
                     'total_orders': sk_orders,
                     'total_payments': sk_payments,
-                    'balance': sk_orders - sk_payments
+                    'balance': sk_orders - sk_payments,
+                    'credit_limit': float(sk_credit.limit_amount) if sk_credit else 0
                 })
             
             return Response({
@@ -165,13 +167,15 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 if not d: continue
                 d_orders = Order.objects.filter(shopkeeper=user, dealer=d, status__in=['confirmed', 'shipped', 'delivered', 'pending']).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
                 d_payments = Payment.objects.filter(shopkeeper=user, dealer=d).aggregate(Sum('amount'))['amount__sum'] or 0
+                d_credit = CreditLimit.objects.filter(dealer=d, shopkeeper=user).first()
                 ledger.append({
                     'dealer_id': d.id,
                     'dealer_name': d.username,
                     'business_name': d.dealer_profile.business_name if hasattr(d, 'dealer_profile') else d.username,
                     'total_orders': d_orders,
                     'total_payments': d_payments,
-                    'balance': d_orders - d_payments
+                    'balance': d_orders - d_payments,
+                    'credit_limit': float(d_credit.limit_amount) if d_credit else 0
                 })
                 
             return Response({
@@ -269,3 +273,23 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 payment.status = 'failed'
                 payment.save()
             return Response({'error': f'Signature verification failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+class CreditLimitViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing credit limits set by dealers"""
+    queryset = CreditLimit.objects.all()
+    serializer_class = CreditLimitSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.user_type == 'dealer':
+            return CreditLimit.objects.filter(dealer=user)
+        elif user.user_type == 'shopkeeper':
+            return CreditLimit.objects.filter(shopkeeper=user)
+        return CreditLimit.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.user_type != 'dealer':
+            raise serializers.ValidationError("Only dealers can set credit limits")
+        serializer.save(dealer=user)
