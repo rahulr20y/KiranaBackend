@@ -30,6 +30,5 @@ RUN mkdir -p /app/staticfiles /app/media && \
 # Expose port
 EXPOSE 8000
 
-# Run migrations and collectstatic, then start gunicorn
-# Use '|| true' to ensure the container starts even if migrations fail, allowing diagnostic access
-CMD ["sh", "-c", "echo 'Running migrations...' && (python manage.py migrate --noinput || echo 'Migrations failed') && echo 'Collecting static files...' && (python manage.py collectstatic --noinput || echo 'Collectstatic failed') && echo 'Starting Gunicorn on port $PORT...' && gunicorn kirana.wsgi:application --bind 0.0.0.0:$PORT --workers 4"]
+# Run migrations and collectstatic, then start daphne for ASGI/WebSocket support
+CMD ["sh", "-c", "echo 'Running migrations...' && (python manage.py migrate --noinput || echo 'Migrations failed') && echo 'Collecting static files...' && (python manage.py collectstatic --noinput || echo 'Collectstatic failed') && echo 'Starting Daphne on port $PORT...' && daphne -b 0.0.0.0 -p $PORT kirana.asgi:application"]
