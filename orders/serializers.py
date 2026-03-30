@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Order, OrderItem
+from .models import Order, OrderItem, ReturnRequest
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -56,3 +56,18 @@ class OrderListSerializer(serializers.ModelSerializer):
     
     def get_item_count(self, obj):
         return obj.items.count()
+
+class ReturnRequestSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='item.product_name', read_only=True)
+    order_number = serializers.CharField(source='order.order_number', read_only=True)
+    shopkeeper_name = serializers.CharField(source='shopkeeper.username', read_only=True)
+
+    class Meta:
+        model = ReturnRequest
+        fields = [
+            'id', 'order', 'order_number', 'item', 'product_name',
+            'shopkeeper', 'shopkeeper_name', 'dealer', 'reason', 
+            'quantity', 'image', 'status', 'dealer_notes', 
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'shopkeeper', 'dealer', 'status', 'created_at', 'updated_at']

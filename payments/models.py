@@ -10,6 +10,7 @@ class Payment(models.Model):
         ('upi', 'UPI'),
         ('bank_transfer', 'Bank Transfer'),
         ('cheque', 'Cheque'),
+        ('return_credit', 'Return Credit'),
         ('other', 'Other'),
     )
 

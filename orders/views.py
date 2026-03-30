@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -10,8 +10,8 @@ import uuid
 import random
 import datetime
 from django.utils import timezone
-from .models import Order, OrderItem
-from .serializers import OrderSerializer, OrderListSerializer, OrderCreateSerializer, OrderItemSerializer
+from .models import Order, OrderItem, ReturnRequest
+from .serializers import OrderSerializer, OrderListSerializer, OrderCreateSerializer, OrderItemSerializer, ReturnRequestSerializer
 from notifications.utils import send_user_notification
 
 
@@ -346,3 +346,109 @@ class OrderViewSet(viewsets.ModelViewSet):
             }
             
         return Response(stats)
+
+class ReturnRequestViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing damaged goods and return requests"""
+    queryset = ReturnRequest.objects.all()
+    serializer_class = ReturnRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.user_type == 'dealer':
+            return ReturnRequest.objects.filter(dealer=user)
+        elif user.user_type == 'shopkeeper':
+            return ReturnRequest.objects.filter(shopkeeper=user)
+        return ReturnRequest.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.user_type != 'shopkeeper':
+            raise serializers.ValidationError("Only shopkeepers can raise return requests")
+            
+        # Verify order belongs to the shopkeeper
+        order = serializer.validated_data['order']
+        if order.shopkeeper != user:
+             raise serializers.ValidationError("You can only request returns for your own orders")
+             
+        serializer.save(shopkeeper=user, dealer=order.dealer)
+        
+        # Notify Dealer
+        send_user_notification(
+            user=order.dealer,
+            title="New Return Request! 📦",
+            message=f"Shopkeeper {user.username} reported an issue with order #{order.order_number}",
+            notification_type="order_update"
+        )
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """Approve return and automatically credit the shopkeeper's account"""
+        return_req = self.get_object()
+        
+        if request.user.user_type != 'dealer' or return_req.dealer != request.user:
+            return Response({'error': 'Only the assigned dealer can approve this'}, status=status.HTTP_403_FORBIDDEN)
+            
+        if return_req.status != 'pending':
+            return Response({'error': 'Only pending requests can be approved'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        dealer_notes = request.data.get('dealer_notes', 'Approved and credited.')
+        
+        from django.db import transaction
+        try:
+            with transaction.atomic():
+                return_req.status = 'approved'
+                return_req.dealer_notes = dealer_notes
+                return_req.save()
+                
+                # AUTOMATIC CREDIT: Create a payment record to reduce ledger balance
+                from payments.models import Payment
+                credit_amount = float(return_req.item.product_price) * int(return_req.quantity)
+                
+                Payment.objects.create(
+                    shopkeeper=return_req.shopkeeper,
+                    dealer=return_req.dealer,
+                    amount=credit_amount,
+                    order=return_req.order,
+                    payment_method='return_credit',
+                    status='success',
+                    notes=f"Credit for Return Request #{return_req.id}: {return_req.reason}"
+                )
+                
+                # Notify Shopkeeper
+                send_user_notification(
+                    user=return_req.shopkeeper,
+                    title="Return Approved! ✅",
+                    message=f"Your return for {return_req.item.product_name} was approved. ₹{credit_amount} was credited to your account.",
+                    notification_type="order_update"
+                )
+        except Exception as e:
+             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+             
+        return Response({'status': 'Approved and credited successfully'})
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject return request"""
+        return_req = self.get_object()
+        
+        if request.user.user_type != 'dealer' or return_req.dealer != request.user:
+            return Response({'error': 'Only the assigned dealer can reject this'}, status=status.HTTP_403_FORBIDDEN)
+            
+        dealer_notes = request.data.get('dealer_notes')
+        if not dealer_notes:
+            return Response({'error': 'Rejection reason is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return_req.status = 'rejected'
+        return_req.dealer_notes = dealer_notes
+        return_req.save()
+        
+        # Notify Shopkeeper
+        send_user_notification(
+            user=return_req.shopkeeper,
+            title="Return Rejected ❌",
+            message=f"Your return request for {return_req.item.product_name} was rejected by the dealer.",
+            notification_type="order_update"
+        )
+        
+        return Response({'status': 'Rejected successfully'})

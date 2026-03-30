@@ -62,3 +62,33 @@ class OrderItem(models.Model):
     
     def __str__(self):
         return f"{self.product_name} x {self.quantity}"
+
+class ReturnRequest(models.Model):
+    """Request for returning damaged or incorrect items"""
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('completed', 'Completed'),
+    )
+    
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='return_requests')
+    item = models.ForeignKey(OrderItem, on_delete=models.CASCADE, related_name='return_requests')
+    shopkeeper = models.ForeignKey(User, on_delete=models.CASCADE, related_name='shopkeeper_returns')
+    dealer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dealer_returns')
+    
+    reason = models.TextField()
+    quantity = models.IntegerField()
+    image = models.ImageField(upload_to='return_images/', blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    dealer_notes = models.TextField(blank=True, null=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'return_requests'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Return Request for {self.item.product_name} (Order {self.order.order_number})"
