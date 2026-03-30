@@ -7,7 +7,9 @@ from django.utils.text import slugify
 from django.db.models import Sum, Count, F
 from django.db.models.functions import TruncDate
 import uuid
+import random
 import datetime
+from django.utils import timezone
 from .models import Order, OrderItem
 from .serializers import OrderSerializer, OrderListSerializer, OrderCreateSerializer, OrderItemSerializer
 from notifications.utils import send_user_notification
@@ -51,8 +53,18 @@ class OrderViewSet(viewsets.ModelViewSet):
             # Generate unique order number
             order_number = f"ORD-{uuid.uuid4().hex[:8].upper()}"
             
-            # Calculate totals
-            total_amount = sum(float(item['subtotal']) for item in items_data)
+            # Calculate totals and verify pricing
+            total_amount = 0
+            for item in items_data:
+                product = item['product']
+                qty = item['quantity']
+                
+                # Use tiered price logic
+                correct_price = product.get_price_for_quantity(qty)
+                item['product_price'] = correct_price
+                item['subtotal'] = float(correct_price) * int(qty)
+                total_amount += item['subtotal']
+                
             discount = float(serializer.validated_data.get('discount', 0))
             net_amount = total_amount - discount
             
@@ -218,22 +230,53 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
         
         new_status = request.data.get('status')
+        otp = request.data.get('otp')
+        
         if new_status not in dict(Order.STATUS_CHOICES):
             return Response(
                 {'error': 'Invalid status'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Security: Requirement 3 - OTP-based Delivery Confirmation
+        if new_status == 'delivered':
+            if not order.delivery_otp:
+                # Should not happen if flow is correct, but just in case
+                return Response({'error': 'Delivery OTP was never generated for this order'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not otp:
+                return Response({'error': 'Secure OTP is required to finalize delivery'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if otp != order.delivery_otp:
+                return Response({'error': 'Incorrect OTP. Please ask the shopkeeper for the secure code.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            order.delivered_at = timezone.now()
+            # Mark it as paid if it's already COD or similar? 
+            # Or just update status.
+            
+        elif new_status == 'shipped':
+            # Generate OTP when order is shipped
+            if not order.delivery_otp:
+                order.delivery_otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+                # Notify Shopkeeper about OTP
+                send_user_notification(
+                    user=order.shopkeeper,
+                    title="Order Shipped! 🚚",
+                    message=f"Order #{order.order_number} is out for delivery. Your secure OTP is {order.delivery_otp}. Share this ONLY with the delivery person.",
+                    notification_type="order_update"
+                )
+        
         order.status = new_status
         order.save()
         
-        # Notify Shopkeeper about status update
-        send_user_notification(
-            user=order.shopkeeper,
-            title="Order Status Updated! 🚚",
-            message=f"Order #{order.order_number} is now {new_status}",
-            notification_type="order_update"
-        )
+        # Generic notification (excluding shipped as it was handled above with OTP)
+        if new_status != 'shipped':
+            send_user_notification(
+                user=order.shopkeeper,
+                title=f"Order Updated! {new_status.capitalize()}",
+                message=f"Order #{order.order_number} is now {new_status}",
+                notification_type="order_update"
+            )
         
         serializer = OrderSerializer(order)
         return Response({

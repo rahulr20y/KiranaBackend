@@ -23,7 +23,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'id', 'order_number', 'shopkeeper', 'shopkeeper_name',
             'dealer', 'dealer_name', 'status', 'payment_status',
             'total_amount', 'discount', 'net_amount', 'shipping_address',
-            'notes', 'items', 'created_at', 'updated_at', 'delivered_at'
+            'notes', 'delivery_otp', 'items', 'created_at', 'updated_at', 'delivered_at'
         ]
         read_only_fields = [
             'id', 'order_number', 'created_at', 'updated_at', 'delivered_at'
@@ -51,7 +51,7 @@ class OrderListSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'order_number', 'dealer_name', 'status', 'payment_status',
-            'net_amount', 'item_count', 'created_at'
+            'net_amount', 'item_count', 'delivery_otp', 'created_at'
         ]
     
     def get_item_count(self, obj):

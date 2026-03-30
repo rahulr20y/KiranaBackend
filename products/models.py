@@ -16,9 +16,23 @@ class Product(models.Model):
     stock_quantity = models.IntegerField(default=0)
     low_stock_threshold = models.IntegerField(default=10)
     image = models.ImageField(upload_to='product_images/', blank=True, null=True)
+    price_tiers = models.JSONField(default=list, blank=True, help_text="e.g. [{'min_quantity': 10, 'price': 90}, {'min_quantity': 50, 'price': 80}]")
     is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    def get_price_for_quantity(self, quantity):
+        """Returns the appropriate tier price for the given quantity"""
+        if not self.price_tiers:
+            return self.price
+        
+        # Sort tiers by min_quantity descending to find the highest applicable tier
+        sorted_tiers = sorted(self.price_tiers, key=lambda x: int(x['min_quantity']), reverse=True)
+        for tier in sorted_tiers:
+            if int(quantity) >= int(tier['min_quantity']):
+                return tier['price']
+        
+        return self.price
     
     class Meta:
         db_table = 'products'

@@ -33,7 +33,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'dealer', 'dealer_name', 'category', 'category_name',
             'name', 'description', 'price', 'unit', 'stock_quantity',
-            'image', 'is_available', 'average_rating', 'review_count',
+            'image', 'price_tiers', 'is_available', 'average_rating', 'review_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'dealer', 'created_at', 'updated_at']
@@ -58,7 +58,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'dealer', 'category', 'name', 'description', 'price',
-            'unit', 'stock_quantity', 'image', 'is_available',
+            'unit', 'stock_quantity', 'image', 'price_tiers', 'is_available',
             'reviews', 'average_rating', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
