@@ -35,13 +35,12 @@ class ProductViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """Create product as the current dealer"""
-        if self.request.user.user_type == 'dealer':
-            serializer.save(dealer=self.request.user)
+        user = self.request.user
+        if user.is_authenticated and user.user_type == 'dealer':
+            serializer.save(dealer=user)
         else:
-            return Response(
-                {'error': 'Only dealers can create products'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Only dealers can create products')
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_products(self, request):
@@ -153,9 +152,9 @@ class ProductViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def by_dealer(self, request):
         """Filter products by dealer"""
-        dealer_id = request.query_params.get('dealer_id')
+        dealer_id = request.query_params.get('dealer_id') or request.query_params.get('dealer')
         if dealer_id:
             products = Product.objects.filter(dealer_id=dealer_id)
             serializer = self.get_serializer(products, many=True)
             return Response(serializer.data)
-        return Response({'error': 'dealer_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'dealer_id or dealer parameter required'}, status=status.HTTP_400_BAD_REQUEST)

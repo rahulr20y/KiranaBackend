@@ -13,12 +13,16 @@ def send_user_notification(user, title, message, notification_type='info'):
     )
     
     # Send via WebSocket
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f"user_{user.id}",
-        {
-            "type": "send_notification",
-            "data": UserNotificationSerializer(notification).data
-        }
-    )
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"user_{user.id}",
+                {
+                    "type": "send_notification",
+                    "data": UserNotificationSerializer(notification).data
+                }
+            )
+    except Exception as e:
+        print(f"Warning: Failed to send WebSocket notification: {str(e)}")
     return notification

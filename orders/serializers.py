@@ -45,13 +45,19 @@ class OrderCreateSerializer(serializers.Serializer):
 
 class OrderListSerializer(serializers.ModelSerializer):
     dealer_name = serializers.CharField(source='dealer.get_full_name', read_only=True)
+    shopkeeper_name = serializers.CharField(source='shopkeeper.get_full_name', read_only=True)
+    dealer_business_name = serializers.CharField(source='dealer.dealer_profile.business_name', default='N/A', read_only=True)
+    shopkeeper_business_name = serializers.CharField(source='shopkeeper.shopkeeper_profile.shop_name', default='N/A', read_only=True)
+    items = OrderItemSerializer(many=True, read_only=True)
     item_count = serializers.SerializerMethodField()
     
     class Meta:
         model = Order
         fields = [
-            'id', 'order_number', 'dealer_name', 'status', 'payment_status',
-            'net_amount', 'item_count', 'delivery_otp', 'created_at'
+            'id', 'order_number', 'dealer_name', 'shopkeeper_name', 
+            'dealer_business_name', 'shopkeeper_business_name',
+            'status', 'payment_status', 'total_amount', 'discount', 
+            'net_amount', 'items', 'item_count', 'delivery_otp', 'created_at'
         ]
     
     def get_item_count(self, obj):

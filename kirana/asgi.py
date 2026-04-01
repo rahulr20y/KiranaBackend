@@ -6,14 +6,15 @@ from django.urls import path
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kirana.settings')
 
-# Import notifications consumers here once created
-from notifications.consumers import NotificationConsumer
-
 django_asgi_app = get_asgi_application()
+
+# Import custom middleware and consumers
+from notifications.consumers import NotificationConsumer
+from .middleware import TokenAuthMiddleware
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
-    "websocket": AuthMiddlewareStack(
+    "websocket": TokenAuthMiddleware(
         URLRouter([
             path("ws/notifications/", NotificationConsumer.as_asgi()),
         ])

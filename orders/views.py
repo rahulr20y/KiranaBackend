@@ -68,42 +68,45 @@ class OrderViewSet(viewsets.ModelViewSet):
             discount = float(serializer.validated_data.get('discount', 0))
             net_amount = total_amount - discount
             
-            # Logic for dealer-initiated or shopkeeper-initiated order
+            # Resolve dealer and shopkeeper users
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            
             if request.user.user_type == 'dealer':
                 dealer = request.user
                 shopkeeper_id = request.data.get('shopkeeper_id')
                 if not shopkeeper_id:
-                    return Response({'error': 'shopkeeper_id is required for dealer-initiated sales'}, status=status.HTTP_400_BAD_REQUEST)
-                try:
+                    return Response({'error': 'shopkeeper_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Check if it's a User ID first
+                shopkeeper = User.objects.filter(id=shopkeeper_id, user_type='shopkeeper').first()
+                if not shopkeeper:
+                    # Try Profile ID fallback
                     from shopkeepers.models import Shopkeeper
-                    shopkeeper_profile = Shopkeeper.objects.get(id=shopkeeper_id)
-                    shopkeeper = shopkeeper_profile.user
-                except Shopkeeper.DoesNotExist:
-                    # Fallback to User ID if profile PK doesn't match
-                    from django.contrib.auth import get_user_model
-                    User = get_user_model()
-                    try:
-                        shopkeeper = User.objects.get(id=shopkeeper_id, user_type='shopkeeper')
-                    except User.DoesNotExist:
-                        return Response({'error': 'Shopkeeper not found'}, status=status.HTTP_404_NOT_FOUND)
+                    shopkeeper_profile = Shopkeeper.objects.filter(id=shopkeeper_id).first()
+                    if shopkeeper_profile:
+                        shopkeeper = shopkeeper_profile.user
+                
+                if not shopkeeper:
+                    return Response({'error': 'Shopkeeper not found'}, status=status.HTTP_404_NOT_FOUND)
             else:
                 # Shopkeeper-initiated order
                 shopkeeper = request.user
                 dealer_id = request.data.get('dealer_id')
                 if not dealer_id:
                     return Response({'error': 'dealer_id is required'}, status=status.HTTP_400_BAD_REQUEST)
-                try:
+                
+                # Check if it's a User ID first (frontend often sends Product.dealer which is a User ID)
+                dealer = User.objects.filter(id=dealer_id, user_type='dealer').first()
+                if not dealer:
+                    # Try Profile ID fallback
                     from dealers.models import Dealer
-                    dealer_profile = Dealer.objects.get(id=dealer_id)
-                    dealer = dealer_profile.user
-                except Dealer.DoesNotExist:
-                    # Fallback to User ID if profile PK doesn't match
-                    from django.contrib.auth import get_user_model
-                    User = get_user_model()
-                    try:
-                        dealer = User.objects.get(id=dealer_id, user_type='dealer')
-                    except User.DoesNotExist:
-                        return Response({'error': 'Dealer not found'}, status=status.HTTP_404_NOT_FOUND)
+                    dealer_profile = Dealer.objects.filter(id=dealer_id).first()
+                    if dealer_profile:
+                        dealer = dealer_profile.user
+                
+                if not dealer:
+                    return Response({'error': 'Dealer not found'}, status=status.HTTP_404_NOT_FOUND)
             
             try:
                 with transaction.atomic():
@@ -166,6 +169,9 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
+        import logging
+        logger = logging.getLogger('django')
+        logger.error(f"Order creation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
