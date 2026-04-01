@@ -42,10 +42,11 @@ class DealerSerializer(serializers.ModelSerializer):
 
 class DealerListSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
     
     class Meta:
         model = Dealer
         fields = [
-            'id', 'user_name', 'business_name', 'business_category',
+            'id', 'user_id', 'user_name', 'business_name', 'business_category',
             'rating', 'total_products', 'total_orders', 'is_verified'
         ]
