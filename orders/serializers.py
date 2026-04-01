@@ -57,7 +57,7 @@ class OrderListSerializer(serializers.ModelSerializer):
             'id', 'order_number', 'dealer_name', 'shopkeeper_name', 
             'dealer_business_name', 'shopkeeper_business_name',
             'status', 'payment_status', 'total_amount', 'discount', 
-            'net_amount', 'items', 'item_count', 'delivery_otp', 'created_at'
+            'net_amount', 'items', 'item_count', 'delivery_otp', 'shipping_address', 'created_at'
         ]
     
     def get_item_count(self, obj):

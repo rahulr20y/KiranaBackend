@@ -37,9 +37,9 @@ class OrderViewSet(viewsets.ModelViewSet):
         """Filter orders based on user type"""
         user = self.request.user
         if user.user_type == 'shopkeeper':
-            return Order.objects.filter(shopkeeper=user).select_related('dealer')
+            return Order.objects.filter(shopkeeper=user).select_related('dealer').prefetch_related('items', 'dealer__dealer_profile')
         elif user.user_type == 'dealer':
-            return Order.objects.filter(dealer=user).select_related('shopkeeper')
+            return Order.objects.filter(dealer=user).select_related('shopkeeper').prefetch_related('items', 'shopkeeper__shopkeeper_profile')
         return Order.objects.none()
     
     def create(self, request, *args, **kwargs):
