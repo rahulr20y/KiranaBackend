@@ -378,6 +378,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                     'name': item.product_name,
                     'product_id': pid,
                     'price': item.product_price,
+                    'dealer_id': item.product.dealer.id,
+                    'dealer_name': item.product.dealer.dealer_profile.business_name if hasattr(item.product.dealer, 'dealer_profile') else item.product.dealer.username,
                     'order_records': [],
                     'total_qty': 0
                 }
@@ -411,6 +413,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                             'product_id': pid,
                             'name': data['name'],
                             'price': data['price'],
+                            'dealer_id': data['dealer_id'],
+                            'dealer_name': data['dealer_name'],
                             'reason': f"Running low! Usually lasts you {int(estimated_duration)} days.",
                             'urgency': 'high' if days_left <= 1 else 'medium'
                         })
@@ -420,6 +424,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                     'product_id': pid,
                     'name': data['name'],
                     'price': data['price'],
+                    'dealer_id': data['dealer_id'],
+                    'dealer_name': data['dealer_name'],
                     'reason': "Time to restock? You last ordered this 10+ days ago.",
                     'urgency': 'low'
                 })
