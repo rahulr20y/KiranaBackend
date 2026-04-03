@@ -451,12 +451,26 @@ class ReturnRequestViewSet(viewsets.ModelViewSet):
         if user.user_type != 'shopkeeper':
             raise serializers.ValidationError("Only shopkeepers can raise return requests")
             
-        # Verify order belongs to the shopkeeper
+        # Verify order belongs to the shopkeeper and is delivered
         order = serializer.validated_data['order']
         if order.shopkeeper != user:
              raise serializers.ValidationError("You can only request returns for your own orders")
+        
+        if order.status != 'delivered':
+            raise serializers.ValidationError("Returns can only be raised for orders marked as 'Delivered'")
              
+        # Check quantity limits
+        item = serializer.validated_data['item']
+        requested_qty = serializer.validated_data['quantity']
+        
+        if requested_qty <= 0:
+            raise serializers.ValidationError("Quantity must be greater than zero")
+            
+        if requested_qty > item.quantity:
+            raise serializers.ValidationError(f"Cannot return more than what was ordered ({item.quantity})")
+            
         serializer.save(shopkeeper=user, dealer=order.dealer)
+
         
         # Notify Dealer
         send_user_notification(
@@ -490,6 +504,15 @@ class ReturnRequestViewSet(viewsets.ModelViewSet):
                 from payments.models import Payment
                 credit_amount = float(return_req.item.product_price) * int(return_req.quantity)
                 
+                # OPTIONAL STOCK RESTORE: If inventory is sellable, add it back to dealer's warehouse
+                restore_stock = request.data.get('restore_stock', False)
+                if restore_stock and return_req.item.product:
+                    return_req.item.product.stock_quantity += return_req.quantity
+                    return_req.item.product.save()
+                    dealer_notes += f" (Stock of {return_req.quantity} units restored in inventory)"
+                    return_req.dealer_notes = dealer_notes
+                    return_req.save()
+
                 Payment.objects.create(
                     shopkeeper=return_req.shopkeeper,
                     dealer=return_req.dealer,
@@ -499,6 +522,7 @@ class ReturnRequestViewSet(viewsets.ModelViewSet):
                     status='success',
                     notes=f"Credit for Return Request #{return_req.id}: {return_req.reason}"
                 )
+
                 
                 # Notify Shopkeeper
                 send_user_notification(
