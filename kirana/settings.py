@@ -202,13 +202,9 @@ LOGGING = {
     },
 }
 
-# Channel layers for WebSockets
-REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+# Channel layers for WebSockets (Falling back to InMemory for Dev environments without Redis)
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [REDIS_URL],
-        },
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
     },
 }
