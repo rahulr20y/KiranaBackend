@@ -14,6 +14,7 @@ from .models import Order, OrderItem, ReturnRequest
 from .serializers import OrderSerializer, OrderListSerializer, OrderCreateSerializer, OrderItemSerializer, ReturnRequestSerializer
 from notifications.utils import send_user_notification
 from .services import ReplenishmentService
+from .route_service import RouteService
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -377,6 +378,31 @@ class OrderViewSet(viewsets.ModelViewSet):
             })
             
         return Response(formatted_suggestions)
+
+    @action(detail=False, methods=['get'], url_path='route-plan')
+    def route_plan(self, request):
+        """Get the optimized delivery sequence for a dealer's shipped orders"""
+        if request.user.user_type != 'dealer':
+            return Response({"error": "Only dealers can access route planning"}, status=403)
+            
+        try:
+            manifest = RouteService.get_optimized_route(request.user)
+            # Group by Pincode for clustering in UI
+            clusters = {}
+            for stop in manifest:
+                pc = stop['pincode']
+                if pc not in clusters:
+                    clusters[pc] = []
+                clusters[pc].append(stop)
+                
+            return Response({
+                "manifest": manifest,
+                "clusters": clusters,
+                "total_stops": len(manifest),
+                "generated_at": timezone.now().isoformat()
+            })
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
 
 class ReturnRequestViewSet(viewsets.ModelViewSet):
     """ViewSet for managing damaged goods and return requests"""

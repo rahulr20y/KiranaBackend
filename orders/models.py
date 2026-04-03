@@ -35,6 +35,8 @@ class Order(models.Model):
     delivery_otp = models.CharField(max_length=6, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    delivery_sequence = models.PositiveIntegerField(default=0)
+    estimated_delivery_time = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(blank=True, null=True)
     
     class Meta:
