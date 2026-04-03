@@ -15,6 +15,7 @@ from .serializers import OrderSerializer, OrderListSerializer, OrderCreateSerial
 from notifications.utils import send_user_notification
 from .services import ReplenishmentService
 from .route_service import RouteService
+from decimal import Decimal
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -274,6 +275,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                 try:
                     staff_profile = request.user.staff_profile
                     staff_profile.orders_processed += 1
+                    # Award incentive (e.g., 10 rupees per delivery)
+                    staff_profile.total_incentives += Decimal('10.00')
                     staff_profile.save()
                 except:
                     pass
@@ -374,7 +377,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             staff_performance = DealerStaff.objects.filter(
                 dealer__user=user
             ).values(
-                'user__username', 'role', 'orders_processed'
+                'user__username', 'role', 'orders_processed', 'total_incentives'
             ).order_by('-orders_processed')
             stats['staff_performance'] = list(staff_performance)
             

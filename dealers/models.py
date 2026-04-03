@@ -17,6 +17,8 @@ class Dealer(models.Model):
     total_orders = models.IntegerField(default=0)
     is_verified = models.BooleanField(default=False)
     is_banned = models.BooleanField(default=False)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -52,6 +54,7 @@ class DealerStaff(models.Model):
     can_manage_inventory = models.BooleanField(default=True)
     can_view_analytics = models.BooleanField(default=False) # Restricted by default
     orders_processed = models.IntegerField(default=0)
+    total_incentives = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     current_lat = models.FloatField(null=True, blank=True)
     current_lng = models.FloatField(null=True, blank=True)
     last_location_update = models.DateTimeField(null=True, blank=True)
