@@ -42,3 +42,19 @@ class DealerDocument(models.Model):
     
     def __str__(self):
         return f"{self.dealer.business_name} - {self.document_type}"
+
+class DealerStaff(models.Model):
+    """Staff member of a Dealer"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='staff_profile')
+    dealer = models.ForeignKey(Dealer, on_delete=models.CASCADE, related_name='staff_members')
+    role = models.CharField(max_length=50, default='Delivery Manager') # Delivery Manager, Inventory Clerk
+    can_manage_orders = models.BooleanField(default=True)
+    can_manage_inventory = models.BooleanField(default=True)
+    can_view_analytics = models.BooleanField(default=False) # Restricted by default
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'dealer_staff'
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} (Staff of {self.dealer.business_name})"

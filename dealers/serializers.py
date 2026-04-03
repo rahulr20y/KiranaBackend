@@ -50,3 +50,18 @@ class DealerListSerializer(serializers.ModelSerializer):
             'id', 'user_id', 'user_name', 'business_name', 'business_category',
             'rating', 'total_products', 'total_orders', 'is_verified'
         ]
+
+from .models import DealerStaff
+
+class DealerStaffSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.CharField(source='user.email', read_only=True)
+    
+    class Meta:
+        model = DealerStaff
+        fields = [
+            'id', 'user', 'username', 'email', 'role', 
+            'can_manage_orders', 'can_manage_inventory', 'can_view_analytics',
+            'created_at'
+        ]

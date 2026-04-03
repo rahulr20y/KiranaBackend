@@ -3,8 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.filters import SearchFilter, OrderingFilter
-from .models import Dealer, DealerDocument
-from .serializers import DealerSerializer, DealerListSerializer, DealerDocumentSerializer
+from .models import Dealer, DealerDocument, DealerStaff
+from .serializers import DealerSerializer, DealerListSerializer, DealerDocumentSerializer, DealerStaffSerializer
+from users.models import User
+from django.db import transaction
 
 
 class DealerViewSet(viewsets.ModelViewSet):
@@ -33,14 +35,17 @@ class DealerViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_profile(self, request):
         """Get current dealer's profile, create if it doesn't exist"""
-        if request.user.user_type != 'dealer':
+        if request.user.user_type not in ['dealer', 'dealer_staff']:
             return Response(
-                {'error': 'User is not a dealer'},
+                {'error': 'User is not a dealer or dealer staff'},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
         try:
-            dealer = request.user.dealer_profile
+            if request.user.user_type == 'dealer_staff':
+                dealer = request.user.staff_profile.dealer
+            else:
+                dealer = request.user.dealer_profile
         except Dealer.DoesNotExist:
             # Lazy creation for legacy users
             dealer = Dealer.objects.create(
@@ -111,3 +116,49 @@ class DealerViewSet(viewsets.ModelViewSet):
                 {'error': 'Dealer profile not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def manage_staff(self, request):
+        """List all staff members for this dealer"""
+        if request.user.user_type != 'dealer':
+            return Response({"error": "Only dealers can manage staff"}, status=403)
+            
+        staff = request.user.dealer_profile.staff_members.all()
+        serializer = DealerStaffSerializer(staff, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def add_staff(self, request):
+        """Invite/Add a new staff member"""
+        if request.user.user_type != 'dealer':
+            return Response({"error": "Only dealers can add staff"}, status=403)
+            
+        username = request.data.get('username')
+        email = request.data.get('email')
+        password = request.data.get('password', 'Staff@123')
+        role = request.data.get('role', 'Delivery Manager')
+        
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "Username already exists"}, status=400)
+            
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                user_type='dealer_staff',
+                first_name=request.data.get('first_name', ''),
+                last_name=request.data.get('last_name', '')
+            )
+            
+            staff = DealerStaff.objects.create(
+                user=user,
+                dealer=request.user.dealer_profile,
+                role=role,
+                can_manage_orders=request.data.get('can_manage_orders', True),
+                can_manage_inventory=request.data.get('can_manage_inventory', True),
+                can_view_analytics=request.data.get('can_view_analytics', False)
+            )
+            
+        serializer = DealerStaffSerializer(staff)
+        return Response(serializer.data, status=201)
