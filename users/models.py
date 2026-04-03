@@ -5,6 +5,7 @@ class User(AbstractUser):
     """Extended User model with additional fields"""
     USER_TYPE_CHOICES = (
         ('dealer', 'Dealer'),
+        ('dealer_staff', 'Dealer Staff'),
         ('shopkeeper', 'Shopkeeper'),
     )
     

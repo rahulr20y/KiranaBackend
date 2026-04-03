@@ -274,6 +274,43 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 payment.save()
             return Response({'error': f'Signature verification failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['post'], url_path='simulate-direct')
+    def simulate_direct_payment(self, request):
+        """Simulate a direct digital payment (Mock Gateway)"""
+        user = request.user
+        if user.user_type != 'shopkeeper':
+            return Response({'error': 'Only shopkeepers can initiate direct payments'}, status=status.HTTP_403_FORBIDDEN)
+            
+        dealer_id = request.data.get('dealer_id')
+        amount = request.data.get('amount')
+        payment_method = request.data.get('payment_method', 'upi')
+        order_id = request.data.get('order_id')
+        
+        if not dealer_id or not amount:
+            return Response({'error': 'dealer_id and amount are required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Create a successful payment record
+        from uuid import uuid4
+        transaction_id = f"KRN-{uuid4().hex[:8].upper()}"
+        
+        payment = Payment.objects.create(
+            shopkeeper=user,
+            dealer_id=dealer_id,
+            amount=amount,
+            order_id=order_id,
+            payment_method=payment_method,
+            status='success',
+            transaction_id=transaction_id,
+            notes=request.data.get('notes', 'Digital payment via Mock Gateway')
+        )
+        
+        return Response({
+            'status': 'success',
+            'message': 'Payment processed successfully via Mock Gateway',
+            'transaction_id': transaction_id,
+            'payment_id': payment.id
+        }, status=status.HTTP_201_CREATED)
+
 class CreditLimitViewSet(viewsets.ModelViewSet):
     """ViewSet for managing credit limits set by dealers"""
     queryset = CreditLimit.objects.all()

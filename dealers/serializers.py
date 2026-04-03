@@ -25,7 +25,8 @@ class DealerSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'business_name', 'business_license', 'gst_number',
             'business_category', 'years_in_business', 'total_products',
-            'rating', 'total_orders', 'is_verified', 'documents', 'created_at'
+            'rating', 'total_orders', 'is_verified', 'documents', 'created_at',
+            'latitude', 'longitude'
         ]
         read_only_fields = ['id', 'created_at']
 
@@ -49,4 +50,19 @@ class DealerListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user_id', 'user_name', 'business_name', 'business_category',
             'rating', 'total_products', 'total_orders', 'is_verified'
+        ]
+
+from .models import DealerStaff
+
+class DealerStaffSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.CharField(source='user.email', read_only=True)
+    
+    class Meta:
+        model = DealerStaff
+        fields = [
+            'id', 'user', 'username', 'email', 'role', 
+            'can_manage_orders', 'can_manage_inventory', 'can_view_analytics',
+            'orders_processed', 'total_incentives', 'created_at'
         ]

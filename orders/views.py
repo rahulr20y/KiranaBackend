@@ -13,6 +13,9 @@ from django.utils import timezone
 from .models import Order, OrderItem, ReturnRequest
 from .serializers import OrderSerializer, OrderListSerializer, OrderCreateSerializer, OrderItemSerializer, ReturnRequestSerializer
 from notifications.utils import send_user_notification
+from .services import ReplenishmentService
+from .route_service import RouteService
+from decimal import Decimal
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -121,9 +124,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                                 status=status.HTTP_400_BAD_REQUEST
                             )
                         
-                        # Deduct stock
-                        product.stock_quantity -= quantity
-                        product.save()
+                        # Deduct stock with audit logging
+                        product.update_stock(-quantity, request.user, 'sale', f"Order #{order_number}")
 
                         # Low Stock Alert
                         if product.stock_quantity <= product.low_stock_threshold:
@@ -229,9 +231,20 @@ class OrderViewSet(viewsets.ModelViewSet):
         """Update order status (only dealer can do this)"""
         order = self.get_object()
         
-        if order.dealer != request.user:
+        # Allow Dealer or authorized Dealer Staff
+        is_owner = order.dealer == request.user
+        is_staff = False
+        if not is_owner and request.user.user_type == 'dealer_staff':
+            try:
+                staff_profile = request.user.staff_profile
+                if staff_profile.dealer.user == order.dealer and staff_profile.can_manage_orders:
+                    is_staff = True
+            except:
+                pass
+        
+        if not is_owner and not is_staff:
             return Response(
-                {'error': 'Only dealer can update order status'},
+                {'error': 'Only dealer or authorized staff can update order status'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -257,8 +270,16 @@ class OrderViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'Incorrect OTP. Please ask the shopkeeper for the secure code.'}, status=status.HTTP_400_BAD_REQUEST)
             
             order.delivered_at = timezone.now()
-            # Mark it as paid if it's already COD or similar? 
-            # Or just update status.
+            # Performance tracking: increment staff counter if handled by staff
+            if request.user.user_type == 'dealer_staff':
+                try:
+                    staff_profile = request.user.staff_profile
+                    staff_profile.orders_processed += 1
+                    # Award incentive (e.g., 10 rupees per delivery)
+                    staff_profile.total_incentives += Decimal('10.00')
+                    staff_profile.save()
+                except:
+                    pass
             
         elif new_status == 'shipped':
             # Generate OTP when order is shipped
@@ -351,86 +372,65 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'out_of_stock': my_products.filter(stock_quantity=0).count()
             }
             
+            # 4. Staff Performance Leaderboard
+            from dealers.models import DealerStaff
+            staff_performance = DealerStaff.objects.filter(
+                dealer__user=user
+            ).values(
+                'user__username', 'role', 'orders_processed', 'total_incentives'
+            ).order_by('-orders_processed')
+            stats['staff_performance'] = list(staff_performance)
+            
         return Response(stats)
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def suggestions(self, request):
         """AI Recommendation: Predict what shopkeeper needs based on order history"""
+        from .services import ReplenishmentService
         user = request.user
         if user.user_type != 'shopkeeper':
             return Response({'error': 'Only shopkeepers can get replenishment suggestions'}, status=403)
 
-        # Get all delivered items for this shopkeeper
-        delivered_items = OrderItem.objects.filter(
-            order__shopkeeper=user,
-            order__status='delivered'
-        ).select_related('product', 'order').order_by('order__created_at')
-
-        if not delivered_items.exists():
-            return Response([])
-
-        # Group by product
-        product_history = {}
-        for item in delivered_items:
-            pid = item.product_id
-            if pid not in product_history:
-                product_history[pid] = {
-                    'name': item.product_name,
-                    'product_id': pid,
-                    'price': item.product_price,
-                    'dealer_id': item.product.dealer.id,
-                    'dealer_name': item.product.dealer.dealer_profile.business_name if hasattr(item.product.dealer, 'dealer_profile') else item.product.dealer.username,
-                    'order_records': [],
-                    'total_qty': 0
-                }
-            
-            product_history[pid]['order_records'].append({
-                'date': item.order.created_at,
-                'qty': item.quantity
+        recommendations = ReplenishmentService.get_recommendations(user)
+        
+        formatted_suggestions = []
+        for r in recommendations:
+            formatted_suggestions.append({
+                'product_id': r['product_id'],
+                'name': r['product_name'],
+                'price': r['price'],
+                'dealer_id': r['dealer_id'],
+                'dealer_name': r['dealer_name'],
+                'reason': f"Usually lasts {int(r['avg_cycle_days'])} days. Order now?",
+                'urgency': 'high' if r['confidence'] == 'High' else 'medium'
             })
-            product_history[pid]['total_qty'] += item.quantity
+            
+        return Response(formatted_suggestions)
 
-        suggestions = []
-        now = timezone.now()
-
-        for pid, data in product_history.items():
-            orders = data['order_records']
-            last_order = orders[-1]
-            days_since_last = (now - last_order['date']).days
-
-            if len(orders) >= 2:
-                # Calculate consumption rate
-                first_order = orders[0]
-                total_days = (last_order['date'] - first_order['date']).days
-                if total_days > 0:
-                    daily_consumption = data['total_qty'] / total_days
-                    # Estimated days until last purchase is finished
-                    estimated_duration = last_order['qty'] / daily_consumption
-                    days_left = estimated_duration - days_since_last
-
-                    if days_left <= 3:
-                        suggestions.append({
-                            'product_id': pid,
-                            'name': data['name'],
-                            'price': data['price'],
-                            'dealer_id': data['dealer_id'],
-                            'dealer_name': data['dealer_name'],
-                            'reason': f"Running low! Usually lasts you {int(estimated_duration)} days.",
-                            'urgency': 'high' if days_left <= 1 else 'medium'
-                        })
-            elif days_since_last >= 10:
-                # Fallback reminder for products ordered only once but long ago
-                suggestions.append({
-                    'product_id': pid,
-                    'name': data['name'],
-                    'price': data['price'],
-                    'dealer_id': data['dealer_id'],
-                    'dealer_name': data['dealer_name'],
-                    'reason': "Time to restock? You last ordered this 10+ days ago.",
-                    'urgency': 'low'
-                })
-
-        return Response(suggestions)
+    @action(detail=False, methods=['get'], url_path='route-plan')
+    def route_plan(self, request):
+        """Get the optimized delivery sequence for a dealer's shipped orders"""
+        if request.user.user_type != 'dealer':
+            return Response({"error": "Only dealers can access route planning"}, status=403)
+            
+        try:
+            manifest = RouteService.get_optimized_route(request.user)
+            # Group by Pincode for clustering in UI
+            clusters = {}
+            for stop in manifest:
+                pc = stop['pincode']
+                if pc not in clusters:
+                    clusters[pc] = []
+                clusters[pc].append(stop)
+                
+            return Response({
+                "manifest": manifest,
+                "clusters": clusters,
+                "total_stops": len(manifest),
+                "generated_at": timezone.now().isoformat()
+            })
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
 
 class ReturnRequestViewSet(viewsets.ModelViewSet):
     """ViewSet for managing damaged goods and return requests"""

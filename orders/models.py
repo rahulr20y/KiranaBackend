@@ -28,6 +28,7 @@ class Order(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
     total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    handled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='handled_orders')
     discount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     net_amount = models.DecimalField(max_digits=12, decimal_places=2)
     shipping_address = models.TextField()
@@ -35,6 +36,8 @@ class Order(models.Model):
     delivery_otp = models.CharField(max_length=6, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    delivery_sequence = models.PositiveIntegerField(default=0)
+    estimated_delivery_time = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(blank=True, null=True)
     
     class Meta:

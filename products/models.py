@@ -34,6 +34,20 @@ class Product(models.Model):
         
         return self.price
     
+    def update_stock(self, amount, user, reason='correction', notes=None):
+        """Update stock and log the change"""
+        self.stock_quantity += int(amount)
+        self.save()
+        StockAuditLog.objects.create(
+            product=self,
+            user=user,
+            change_amount=amount,
+            new_stock=self.stock_quantity,
+            reason=reason,
+            notes=notes
+        )
+        return self.stock_quantity
+
     class Meta:
         db_table = 'products'
         verbose_name = 'Product'
@@ -63,3 +77,28 @@ class ProductReview(models.Model):
     
     def __str__(self):
         return f"{self.product.name} - {self.rating} stars"
+
+class StockAuditLog(models.Model):
+    """Log for tracking stock changes with accountability"""
+    MODIFICATION_TYPES = (
+        ('restock', 'Restocking'),
+        ('sale', 'Sale / Order'),
+        ('return', 'Return / Credit'),
+        ('correction', 'Inventory Correction'),
+        ('initial', 'Initial Stock'),
+    )
+    
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='audit_logs')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    change_amount = models.IntegerField()
+    new_stock = models.IntegerField()
+    reason = models.CharField(max_length=50, choices=MODIFICATION_TYPES, default='restock')
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'stock_audit_logs'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.product.name}: {self.change_amount} ({self.reason})"
