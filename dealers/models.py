@@ -51,6 +51,7 @@ class DealerStaff(models.Model):
     can_manage_orders = models.BooleanField(default=True)
     can_manage_inventory = models.BooleanField(default=True)
     can_view_analytics = models.BooleanField(default=False) # Restricted by default
+    orders_processed = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:

@@ -63,5 +63,5 @@ class DealerStaffSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'username', 'email', 'role', 
             'can_manage_orders', 'can_manage_inventory', 'can_view_analytics',
-            'created_at'
+            'orders_processed', 'created_at'
         ]

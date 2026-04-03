@@ -231,9 +231,20 @@ class OrderViewSet(viewsets.ModelViewSet):
         """Update order status (only dealer can do this)"""
         order = self.get_object()
         
-        if order.dealer != request.user:
+        # Allow Dealer or authorized Dealer Staff
+        is_owner = order.dealer == request.user
+        is_staff = False
+        if not is_owner and request.user.user_type == 'dealer_staff':
+            try:
+                staff_profile = request.user.staff_profile
+                if staff_profile.dealer.user == order.dealer and staff_profile.can_manage_orders:
+                    is_staff = True
+            except:
+                pass
+        
+        if not is_owner and not is_staff:
             return Response(
-                {'error': 'Only dealer can update order status'},
+                {'error': 'Only dealer or authorized staff can update order status'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -259,8 +270,14 @@ class OrderViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'Incorrect OTP. Please ask the shopkeeper for the secure code.'}, status=status.HTTP_400_BAD_REQUEST)
             
             order.delivered_at = timezone.now()
-            # Mark it as paid if it's already COD or similar? 
-            # Or just update status.
+            # Performance tracking: increment staff counter if handled by staff
+            if request.user.user_type == 'dealer_staff':
+                try:
+                    staff_profile = request.user.staff_profile
+                    staff_profile.orders_processed += 1
+                    staff_profile.save()
+                except:
+                    pass
             
         elif new_status == 'shipped':
             # Generate OTP when order is shipped
@@ -352,6 +369,15 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'low_stock_items': my_products.filter(stock_quantity__lte=F('low_stock_threshold')).count(),
                 'out_of_stock': my_products.filter(stock_quantity=0).count()
             }
+            
+            # 4. Staff Performance Leaderboard
+            from dealers.models import DealerStaff
+            staff_performance = DealerStaff.objects.filter(
+                dealer__user=user
+            ).values(
+                'user__username', 'role', 'orders_processed'
+            ).order_by('-orders_processed')
+            stats['staff_performance'] = list(staff_performance)
             
         return Response(stats)
 
