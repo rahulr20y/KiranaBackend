@@ -162,3 +162,35 @@ class DealerViewSet(viewsets.ModelViewSet):
             
         serializer = DealerStaffSerializer(staff)
         return Response(serializer.data, status=201)
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def update_staff_location(self, request):
+        """Update current staff member's live location"""
+        if request.user.user_type != 'dealer_staff':
+            return Response({"error": "Only dealer staff can update location"}, status=403)
+            
+        try:
+            staff = request.user.staff_profile
+            staff.current_lat = request.data.get('lat')
+            staff.current_lng = request.data.get('lng')
+            from django.utils import timezone
+            staff.last_location_update = timezone.now()
+            staff.save()
+            return Response({"status": "Location updated successfully"})
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def get_staff_locations(self, request):
+        """Get live locations of all staff members for the dealer"""
+        if request.user.user_type != 'dealer':
+            return Response({"error": "Only dealers can view live staff locations"}, status=403)
+            
+        staff_members = request.user.dealer_profile.staff_members.all()
+        return Response([{
+            'id': staff.id,
+            'name': staff.user.get_full_name() or staff.user.username,
+            'lat': staff.current_lat,
+            'lng': staff.current_lng,
+            'last_update': staff.last_location_update,
+            'role': staff.role
+        } for staff in staff_members if staff.current_lat and staff.current_lng])

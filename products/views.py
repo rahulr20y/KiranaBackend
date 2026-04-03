@@ -169,6 +169,55 @@ class ProductViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         return Response({'error': 'dealer_id or dealer parameter required'}, status=status.HTTP_400_BAD_REQUEST)
     
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def variance_report(self, request):
+        """Get inventory variance report for the current dealer"""
+        if request.user.user_type != 'dealer':
+            return Response({'error': 'Unauthorized'}, status=403)
+            
+        from .models import StockAuditLog, Product
+        from django.db.models import Sum, Count, Q
+        import datetime
+        
+        last_30_days = datetime.date.today() - datetime.timedelta(days=30)
+        
+        # 1. Overall Movement by Reason
+        movements = StockAuditLog.objects.filter(
+            product__dealer=request.user,
+            created_at__date__gte=last_30_days
+        ).values('reason').annotate(
+            total_change=Sum('change_amount'),
+            record_count=Count('id')
+        )
+        
+        # 2. Daily Movement Trend
+        from django.db.models.functions import TruncDate
+        trends = StockAuditLog.objects.filter(
+            product__dealer=request.user,
+            created_at__date__gte=last_30_days
+        ).annotate(
+            date=TruncDate('created_at')
+        ).values('date').annotate(
+            gains=Sum('change_amount', filter=Q(change_amount__gt=0)),
+            losses=Sum('change_amount', filter=Q(change_amount__lt=0))
+        ).order_by('date')
+        
+        # 3. Top Changed Products (Losses - primarily sales)
+        top_losses = StockAuditLog.objects.filter(
+            product__dealer=request.user,
+            change_amount__lt=0,
+            created_at__date__gte=last_30_days
+        ).values('product__name').annotate(
+            total_loss=Sum('change_amount')
+        ).order_by('total_loss')[:5]
+
+        return Response({
+            'movements': list(movements),
+            'trends': list(trends),
+            'top_losses': list(top_losses),
+            'period': 'Last 30 Days'
+        })
+
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def audit_logs(self, request, pk=None):
         """Get inventory audit logs for a product"""
