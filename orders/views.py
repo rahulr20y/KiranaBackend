@@ -123,9 +123,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                                 status=status.HTTP_400_BAD_REQUEST
                             )
                         
-                        # Deduct stock
-                        product.stock_quantity -= quantity
-                        product.save()
+                        # Deduct stock with audit logging
+                        product.update_stock(-quantity, request.user, 'sale', f"Order #{order_number}")
 
                         # Low Stock Alert
                         if product.stock_quantity <= product.low_stock_threshold:

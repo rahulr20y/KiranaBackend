@@ -37,7 +37,17 @@ class ProductViewSet(viewsets.ModelViewSet):
         """Create product as the current dealer"""
         user = self.request.user
         if user.is_authenticated and user.user_type == 'dealer':
-            serializer.save(dealer=user)
+            product = serializer.save(dealer=user)
+            # Log initial stock
+            from .models import StockAuditLog
+            StockAuditLog.objects.create(
+                product=product,
+                user=user,
+                change_amount=product.stock_quantity,
+                new_stock=product.stock_quantity,
+                reason='initial',
+                notes='Product initially added to catalog'
+            )
         else:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('Only dealers can create products')
@@ -158,3 +168,49 @@ class ProductViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(products, many=True)
             return Response(serializer.data)
         return Response({'error': 'dealer_id or dealer parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def audit_logs(self, request, pk=None):
+        """Get inventory audit logs for a product"""
+        product = self.get_object()
+        # Verify dealer ownership or staff authorization
+        is_owner = product.dealer == request.user
+        if not is_owner and request.user.user_type == 'dealer_staff':
+            if request.user.staff_profile.dealer.user != product.dealer:
+                return Response({'error': 'Not authorized'}, status=403)
+        elif not is_owner:
+             return Response({'error': 'Not authorized'}, status=403)
+             
+        logs = product.audit_logs.all().order_by('-created_at')
+        return Response([{
+            'id': log.id,
+            'user': log.user.username if log.user else 'System',
+            'change': log.change_amount,
+            'new_stock': log.new_stock,
+            'reason': log.reason,
+            'notes': log.notes,
+            'date': log.created_at
+        } for log in logs])
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def update_stock(self, request, pk=None):
+        """Update stock with audit logging"""
+        product = self.get_object()
+        amount = request.data.get('amount')
+        reason = request.data.get('reason', 'correction')
+        notes = request.data.get('notes', '')
+        
+        if amount is None:
+            return Response({'error': 'Amount is required'}, status=400)
+            
+        try:
+            # Re-use the model method
+            new_stock = product.update_stock(amount, request.user, reason, notes)
+            return Response({
+                'id': product.id,
+                'name': product.name,
+                'new_stock': new_stock,
+                'message': 'Stock updated successfully'
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
