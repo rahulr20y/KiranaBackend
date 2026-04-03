@@ -67,13 +67,17 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='item.product_name', read_only=True)
     order_number = serializers.CharField(source='order.order_number', read_only=True)
     shopkeeper_name = serializers.CharField(source='shopkeeper.username', read_only=True)
+    credit_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = ReturnRequest
         fields = [
             'id', 'order', 'order_number', 'item', 'product_name',
             'shopkeeper', 'shopkeeper_name', 'dealer', 'reason', 
-            'quantity', 'image', 'status', 'dealer_notes', 
+            'quantity', 'image', 'status', 'dealer_notes', 'credit_amount',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'shopkeeper', 'dealer', 'status', 'created_at', 'updated_at']
+
+    def get_credit_amount(self, obj):
+        return float(obj.item.product_price) * int(obj.quantity)
